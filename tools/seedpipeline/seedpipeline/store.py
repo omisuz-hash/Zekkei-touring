@@ -71,7 +71,7 @@ class Store:
         self.db.executescript(SCHEMA)
         # 既存 DB への列追加（あれば無視）
         cols = {r[1] for r in self.db.execute("pragma table_info(roads)")}
-        for col, typ in (("start_municipality", "text"), ("end_municipality", "text"), ("approx_length_km", "real")):
+        for col, typ in (("start_municipality", "text"), ("end_municipality", "text"), ("approx_length_km", "real"), ("repair_attempts", "integer default 0")):
             if col not in cols:
                 self.db.execute(f"alter table roads add column {col} {typ}")
         self.db.commit()
@@ -202,6 +202,31 @@ class Store:
         q = f"select * from roads where geo_status in ({ph}) order by mentions desc, confidence desc"
         return [dict(r) for r in self.db.execute(q, statuses)]
 
+    def roads_to_repair(self, limit: int, min_mentions: int = 2) -> list[dict]:
+        return [dict(r) for r in self.db.execute(
+            """select * from roads where geo_status in ('failed','suspect') and coalesce(repair_attempts,0)=0
+               and mentions>=? and coalesce(confidence,0)>=0.5 order by mentions desc limit ?""", (min_mentions, limit))]
+
+    def apply_repair(self, road_id: int, fix: dict):
+        self.db.execute("""update roads set start_label=?, start_municipality=?, end_label=?, end_municipality=?, via_labels=?,
+            approx_length_km=coalesce(?, approx_length_km), prefecture=case when ?<>'' then ? else prefecture end,
+            repair_attempts=coalesce(repair_attempts,0)+1, geo_status='pending', geom=null, geo_error=null, updated_at=datetime('now') where id=?""",
+                        (fix["start_label"], fix.get("start_municipality", ""), fix["end_label"], fix.get("end_municipality", ""),
+                         json.dumps(fix.get("via_labels", []), ensure_ascii=False), fix.get("approx_length_km"),
+                         fix.get("prefecture", "") or "", fix.get("prefecture", "") or "", road_id))
+        self.db.commit()
+
+    def mark_repair_attempted(self, road_id: int):
+        self.db.execute("update roads set repair_attempts=coalesce(repair_attempts,0)+1 where id=?", (road_id,))
+        self.db.commit()
+
+    def merge_roads(self, keep_id: int, drop_id: int, take_drop_geometry: bool = False):
+        if take_drop_geometry:
+            self.db.execute("""update roads set geom=(select geom from roads where id=?), length_m=(select length_m from roads where id=?),
+                curviness=(select curviness from roads where id=?), start_label=(select start_label from roads where id=?),
+                end_label=(select end_label from roads where id=?) where id=?""", (drop_id, drop_id, drop_id, drop_id, drop_id, keep_id))
+        self._merge_rest(keep_id, drop_id)
+
     def reset_geo(self, statuses: tuple[str, ...] = ("failed", "suspect", "ok")) -> int:
         ph = ",".join("?" * len(statuses))
         cur = self.db.execute(f"update roads set geo_status='pending', geom=null, geo_error=null where geo_status in ({ph})", statuses)
@@ -221,7 +246,7 @@ class Store:
         return [dict(r) for r in self.db.execute("""select rv.*, v.title, v.channel, v.view_count from road_videos rv join videos v on v.id=rv.video_id
             where rv.road_id=? order by v.view_count desc""", (road_id,))]
 
-    def merge_roads(self, keep_id: int, drop_id: int):
+    def _merge_rest(self, keep_id: int, drop_id: int):
         self.db.execute("insert or ignore into road_videos(road_id,video_id,timestamp,evidence,confidence) select ?,video_id,timestamp,evidence,confidence from road_videos where road_id=?", (keep_id, drop_id))
         self.db.execute("delete from road_videos where road_id=?", (drop_id,))
         self.db.execute("update roads set mentions=(select count(*) from road_videos where road_id=?) where id=?", (keep_id, keep_id))

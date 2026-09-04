@@ -259,7 +259,7 @@ def _pref_core(p: str) -> str:
 
 
 # 通称で呼ばれる道は 1 本あたりこの距離を超えることはまれ。超えたら「要確認」に落とす
-MAX_PLAUSIBLE_M = 120_000
+MAX_PLAUSIBLE_M = 200_000
 
 
 def build_geometry(geo, road: dict) -> dict:

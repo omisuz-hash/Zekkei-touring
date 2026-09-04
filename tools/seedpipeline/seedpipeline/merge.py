@@ -44,19 +44,26 @@ def overlap_ratio(a: list[tuple[float, float]], b: list[tuple[float, float]], to
     return hit / len(sa)
 
 
-def find_duplicates(roads: list[dict]) -> list[tuple[int, int, float]]:
-    """形状がほぼ同じ道の組を返す (keep_id, drop_id, ratio)。言及数の多い方を残す"""
+def find_duplicates(roads: list[dict]) -> list[tuple[int, int, float, bool]]:
+    """同じ道とみなす組を返す (keep_id, drop_id, ratio, take_drop_geometry)。
+    - 形状が互いに 80%/50% 以上重なる → 同じ道
+    - 短い方が長い方に 80% 以上含まれる（志賀草津道路 20km と志賀草津高原ルート 44km など）→ 同じ道。長い方の形状を残す
+    残す ID は言及数の多い方"""
     out = []
-    geo = [(r["id"], r["_coords"], r["mentions"]) for r in roads if r.get("_coords")]
+    geo = [(r["id"], r["_coords"], r["mentions"], r.get("length_m") or 0) for r in roads if r.get("_coords")]
     for i in range(len(geo)):
         for j in range(i + 1, len(geo)):
-            ia, ca, ma = geo[i]
-            ib, cb, mb = geo[j]
-            # 外接矩形が離れていれば計算しない
+            ia, ca, ma, la = geo[i]
+            ib, cb, mb, lb = geo[j]
             if abs(ca[0][1] - cb[0][1]) > 1.0 or abs(ca[0][0] - cb[0][0]) > 1.0:
                 continue
-            r1, r2 = overlap_ratio(ca, cb), overlap_ratio(cb, ca)
-            if max(r1, r2) >= 0.8 and min(r1, r2) >= 0.5:
-                keep, drop = (ia, ib) if ma >= mb else (ib, ia)
-                out.append((keep, drop, max(r1, r2)))
+            r1, r2 = overlap_ratio(ca, cb), overlap_ratio(cb, ca)  # r1: a の点が b の近くにある割合
+            same = max(r1, r2) >= 0.8 and min(r1, r2) >= 0.5
+            contained = (r1 >= 0.8 and la <= lb) or (r2 >= 0.8 and lb <= la)
+            if not (same or contained):
+                continue
+            keep, drop = (ia, ib) if ma >= mb else (ib, ia)
+            drop_len = lb if drop == ib else la
+            keep_len = la if keep == ia else lb
+            out.append((keep, drop, max(r1, r2), drop_len > keep_len * 1.2))
     return out

@@ -173,6 +173,29 @@ class Pipeline:
             self.geo.calls = 0
         return ok
 
+    # 4b. 修復: 座標にできなかった道を、Gemini の一般知識で言い直して再試行 ----------
+    def repair(self, limit: int = 100) -> int:
+        if not self.llm:
+            return 0
+        n = 0
+        for r in self.store.roads_to_repair(limit):
+            try:
+                fix = self.llm.refine_road(r["name"], r["prefecture"] or "", r["road_number"] or "", r["start_label"], r["end_label"])
+                self.store.add_quota(gemini_calls=1)
+            except HTTPError as e:
+                if e.status == 429:
+                    log("Gemini の利用枠に達したため修復を中断します")
+                    break
+                self.store.mark_repair_attempted(r["id"])
+                continue
+            if not fix.get("known") or not fix.get("start_label") or not fix.get("end_label"):
+                self.store.mark_repair_attempted(r["id"])
+                continue
+            self.store.apply_repair(r["id"], fix)
+            n += 1
+            log(f"修復候補: {r['name']} → {fix['start_label']}（{fix.get('start_municipality','')}）〜 {fix['end_label']}（{fix.get('end_municipality','')}）")
+        return n
+
     # 5. 統合 ------------------------------------------------------------
     def dedupe(self) -> int:
         roads = self.store.roads(geo_ok_only=True)
@@ -181,13 +204,13 @@ class Pipeline:
         pairs = find_duplicates(roads)
         seen = set()
         n = 0
-        for keep, drop, ratio in pairs:
+        for keep, drop, ratio, take_drop_geom in pairs:
             if drop in seen or keep in seen:
                 continue
-            self.store.merge_roads(keep, drop)
+            self.store.merge_roads(keep, drop, take_drop_geom)
             seen.add(drop)
             n += 1
-            log(f"統合: {drop} → {keep}（重なり {ratio:.0%}）")
+            log(f"統合: {drop} → {keep}（重なり {ratio:.0%}{'・長い方の形状を採用' if take_drop_geom else ''}）")
         return n
 
     def retry_geo(self, include_ok: bool = False) -> int:
@@ -218,6 +241,8 @@ class Pipeline:
             fetched = self._stage("取得", self.fetch)
             extracted = self._stage("抽出", self.extract)
             geo = self._stage("形状", self.georeference)
+            if self._stage("修復", self.repair):
+                geo += self._stage("形状（修復後）", self.georeference)
             if not until_empty:
                 break
             pending = self.store.stats()

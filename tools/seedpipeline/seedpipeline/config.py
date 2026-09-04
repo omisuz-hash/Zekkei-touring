@@ -26,7 +26,7 @@ class Config:
     # 映像解析（Gemini に YouTube URL を渡す）を使う上限本数/実行。無料枠は 1 日 8 時間分が目安
     max_video_analyses_per_run: int = field(default_factory=lambda: int(_env("SEED_MAX_VIDEO_ANALYSES", "20")))
     # 1 回の実行で形状を付ける道の上限
-    max_geo_per_run: int = field(default_factory=lambda: int(_env("SEED_MAX_GEO", "200")))
+    max_geo_per_run: int = field(default_factory=lambda: int(_env("SEED_MAX_GEO", "600")))
     # 当たりチャンネルの投稿一覧を 1 回の実行でたどる数
     channels_per_run: int = field(default_factory=lambda: int(_env("SEED_CHANNELS_PER_RUN", "5")))
     # 動画の長さ（秒）。短すぎる（Shorts）と長すぎる（生配信）は除外
