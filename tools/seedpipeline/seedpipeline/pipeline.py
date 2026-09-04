@@ -5,7 +5,7 @@ from .config import Config
 from .store import Store
 from .youtube import YouTube, QuotaExceeded, parse_chapters, looks_like_touring
 from .gemini import Gemini
-from .geo import make_geo, build_geometry, GeoError
+from .geo import make_geo, build_geometry, GeoError, CachedGeo
 from .merge import road_key, find_duplicates
 from .http import HTTPError
 
@@ -26,7 +26,7 @@ class Pipeline:
     @property
     def geo(self):
         if self._geo is None:
-            self._geo = make_geo(self.cfg.geo_provider, self.cfg.google_geocoding_api_key, self.cfg.google_routes_api_key)
+            self._geo = CachedGeo(make_geo(self.cfg.geo_provider, self.cfg.google_geocoding_api_key, self.cfg.google_routes_api_key), self.store)
         return self._geo
 
     def _spend_yt(self):

@@ -33,6 +33,7 @@ create table if not exists channels (
 create table if not exists quota (day text primary key, youtube_units integer default 0, gemini_calls integer default 0,
   video_analyses integer default 0, geo_calls integer default 0);
 create table if not exists searches (keyword text, page integer, done integer default 0, primary key (keyword, page));
+create table if not exists geocache (q text primary key, lng real, lat real, pref text, addr text, created_at text);
 """
 
 
@@ -198,6 +199,14 @@ class Store:
         self.db.execute("delete from road_videos where road_id=?", (drop_id,))
         self.db.execute("update roads set mentions=(select count(*) from road_videos where road_id=?) where id=?", (keep_id, keep_id))
         self.db.execute("delete from roads where id=?", (drop_id,))
+        self.db.commit()
+
+    def geocache_get(self, q: str):
+        r = self.db.execute("select lng, lat, pref, addr from geocache where q=?", (q,)).fetchone()
+        return (r["lng"], r["lat"], r["pref"], r["addr"]) if r else None
+
+    def geocache_put(self, q: str, lng, lat, pref, addr):
+        self.db.execute("insert or replace into geocache(q,lng,lat,pref,addr,created_at) values (?,?,?,?,?,datetime('now'))", (q, lng, lat, pref, addr))
         self.db.commit()
 
     def stats(self) -> dict:

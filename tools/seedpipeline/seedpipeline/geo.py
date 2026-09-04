@@ -209,6 +209,40 @@ class OSMGeo:
         return decode_polyline(data["routes"][0]["geometry"])
 
 
+class CachedGeo:
+    """同じ地名（道の駅、峠など）を何度も座標にしないためのキャッシュ。地図 API の呼び出し数を減らす"""
+    def __init__(self, inner, store):
+        self.inner = inner
+        self.store = store
+        self.last_address = ""
+
+    @property
+    def calls(self):
+        return self.inner.calls
+
+    @calls.setter
+    def calls(self, v):
+        self.inner.calls = v
+
+    def geocode(self, label: str, prefecture: str, municipality: str = ""):
+        q = f"{type(self.inner).__name__}|{prefecture}{municipality} {label}".strip()
+        hit = self.store.geocache_get(q)
+        if hit:
+            lng, lat, pref, addr = hit
+            self.last_address = addr or ""
+            return (lng, lat, pref) if lng is not None else None
+        r = self.inner.geocode(label, prefecture, municipality)
+        self.last_address = getattr(self.inner, "last_address", "") or ""
+        if r:
+            self.store.geocache_put(q, r[0], r[1], r[2], self.last_address)
+        else:
+            self.store.geocache_put(q, None, None, "", "")
+        return r
+
+    def route(self, points):
+        return self.inner.route(points)
+
+
 def make_geo(provider: str, geocoding_key: str, routes_key: str | None = None):
     if provider == "google":
         if not geocoding_key or not (routes_key or geocoding_key):
