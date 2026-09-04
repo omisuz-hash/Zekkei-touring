@@ -133,6 +133,34 @@ class Gemini:
         text = "".join(p.get("text", "") for p in cands[0]["content"].get("parts", [])) if cands else ""
         return text.strip()[:20] or "(空の応答)"
 
+    REFINE_SCHEMA = {
+        "type": "OBJECT",
+        "properties": {
+            "known": {"type": "BOOLEAN", "description": "この道を知っているか"},
+            "canonical_name": {"type": "STRING", "description": "一般に使われる正式な通称"},
+            "prefecture": {"type": "STRING"},
+            "start_label": {"type": "STRING", "description": "起点の具体的な地名・施設名・交差点名"},
+            "start_municipality": {"type": "STRING"},
+            "end_label": {"type": "STRING", "description": "終点の具体的な地名・施設名・交差点名"},
+            "end_municipality": {"type": "STRING"},
+            "via_labels": {"type": "ARRAY", "items": {"type": "STRING"}, "description": "途中の峠・展望台・道の駅など最大3つ"},
+            "approx_length_km": {"type": "NUMBER"},
+        },
+        "required": ["known", "start_label", "end_label"],
+    }
+
+    def refine_road(self, name: str, prefecture: str, road_number: str, start: str, end: str) -> dict:
+        """地図で座標にできなかった道について、一般知識で起点・終点を具体的に言い直す"""
+        text = f"""次の道について、あなたの一般知識で答えてください（動画の情報は不要です）。
+道の名前: {name}
+路線番号: {road_number or '不明'}
+都道府県: {prefecture or '不明'}
+これまでの始点・終点（地図で見つからなかった）: {start} 〜 {end}
+
+この道の「走って気持ちいい区間」の起点と終点を、Google マップで検索して一意に決まる具体名（交差点名、道の駅、峠名、IC 名、駅名など）で答え、必ず市区町村名を添えてください。
+途中の代表的な地点（峠、展望台、道の駅）を最大 3 つと、その区間のおおよその距離 km も答えてください。知らない道なら known を false にしてください。"""
+        return self._generate([{"text": text}], self.REFINE_SCHEMA, temperature=0.1)
+
     def list_models(self) -> list[str]:
         data = request(f"{API}/models", headers={"x-goog-api-key": self.key})
         return [m["name"].split("/")[-1] for m in data.get("models", []) if "generateContent" in m.get("supportedGenerationMethods", [])]

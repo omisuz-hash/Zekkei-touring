@@ -151,6 +151,7 @@ def main():
     f = sub.add_parser("fetch", help="概要欄・コメントを取得"); f.add_argument("--limit", type=int)
     e = sub.add_parser("extract", help="Gemini で道を抽出"); e.add_argument("--limit", type=int); e.add_argument("--video-analyses", type=int)
     g = sub.add_parser("georeference", help="地図 API で形状を付ける"); g.add_argument("--limit", type=int, default=200)
+    rp = sub.add_parser("repair", help="座標にできなかった道を Gemini の一般知識で言い直して再試行"); rp.add_argument("--limit", type=int, default=100)
     sub.add_parser("dedupe", help="重複統合")
     x = sub.add_parser("export", help="SQL / GeoJSON / レポートを出力"); x.add_argument("--out", default="out"); x.add_argument("--min-confidence", type=float, default=0.5); x.add_argument("--min-scenery", type=float, default=2.5)
     sub.add_parser("stats")
@@ -179,6 +180,8 @@ def main():
         log(f"抽出 {p.extract(args.limit, args.video_analyses)} 本の道")
     elif args.cmd == "georeference":
         log(f"形状 OK {p.georeference(args.limit)} 本")
+    elif args.cmd == "repair":
+        n = p.repair(args.limit); log(f"修復候補 {n} 本 → 形状 OK {p.georeference() if n else 0} 本")
     elif args.cmd == "dedupe":
         log(f"統合 {p.dedupe()} 組")
     elif args.cmd == "export":
