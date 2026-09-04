@@ -9,8 +9,8 @@ trap 'rm -f "$TMP"' EXIT
 
 ask() {  # ask 変数名 説明
   local var="$1" desc="$2" val
-  read -r -s -p "$desc（入力は表示されません。空なら省略）: " val; echo
-  printf 'export %s=%q\n' "$var" "$val" >> "$TMP"
+  read -r -s -p "${desc}（入力は表示されません。空なら省略）: " val; echo
+  printf 'export %s=%q\n' "${var}" "${val}" >> "$TMP"
 }
 
 echo "絶景道 シード収集ツール: API キーの登録"
