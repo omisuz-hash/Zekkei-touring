@@ -58,6 +58,56 @@ def cmd_export(p: Pipeline, out_dir: str, min_conf: float):
     log(f"レポート → {rep}")
 
 
+def cmd_check(cfg: Config) -> bool:
+    """4 つのキーを最小限の呼び出しで検証する（YouTube 1 ユニット、他は各 1 回）"""
+    from seedpipeline.youtube import YouTube
+    from seedpipeline.gemini import Gemini
+    from seedpipeline.geo import GoogleGeo
+    from seedpipeline.http import HTTPError
+    ok = True
+
+    def report(name, fn):
+        nonlocal ok
+        try:
+            r = fn()
+            print(f"  OK   {name}: {r}")
+        except HTTPError as e:
+            ok = False
+            hint = ""
+            if e.status == 403 and ("not been used" in e.body or "disabled" in e.body):
+                hint = "（API が有効化されていません）"
+            elif e.status in (400, 403):
+                hint = "（キーが無効か、API の制限に含まれていません）"
+            print(f"  NG   {name}: HTTP {e.status} {hint}\n       {e.body[:200]}")
+        except Exception as e:
+            ok = False
+            print(f"  NG   {name}: {e}")
+
+    print("キーの検証:")
+    if cfg.youtube_api_key:
+        report("YouTube Data API", lambda: YouTube(cfg.youtube_api_key, 100).videos(["dQw4w9WgXcQ"])[0]["title"][:30])
+    else:
+        ok = False; print("  NG   YouTube: YOUTUBE_API_KEY 未設定")
+    if cfg.gemini_api_key:
+        def gem():
+            g = Gemini(cfg.gemini_api_key, cfg.gemini_model)
+            models = g.list_models()
+            if cfg.gemini_model not in models:
+                raise RuntimeError(f"モデル {cfg.gemini_model} が使えません。候補: {', '.join(models[:8])}")
+            return f"モデル {cfg.gemini_model} 利用可"
+        report("Gemini API", gem)
+    else:
+        ok = False; print("  NG   Gemini: GEMINI_API_KEY 未設定")
+    if cfg.geo_provider == "google":
+        geo = GoogleGeo(cfg.google_geocoding_api_key, cfg.google_routes_api_key)
+        report("Geocoding API", lambda: geo.geocode("白樺湖", "長野県"))
+        report("Routes API", lambda: f"{len(geo.route([(138.157, 36.109), (138.138, 36.223)]))} 点の経路")
+    else:
+        print("  --   地図: OpenStreetMap（無料）を使用")
+    print("結果:", "すべて OK" if ok else "問題あり")
+    return ok
+
+
 def cmd_selftest():
     from seedpipeline.geo import decode_polyline, simplify, length_m, curviness, ewkt
     from seedpipeline.merge import road_key, normalize_name, overlap_ratio
@@ -106,11 +156,14 @@ def main():
     i = sub.add_parser("import-json", help="tools/youtube の取得結果を取り込む"); i.add_argument("path")
     sub.add_parser("models", help="使える Gemini モデル")
     sub.add_parser("selftest")
+    sub.add_parser("check", help="4 つのキーを検証")
     args = ap.parse_args()
 
     if args.cmd == "selftest":
         return cmd_selftest()
     cfg = Config()
+    if args.cmd == "check":
+        return sys.exit(0 if cmd_check(cfg) else 1)
     p = Pipeline(cfg)
     if args.cmd == "run":
         p.run(); cmd_export(p, "out", 0.5)

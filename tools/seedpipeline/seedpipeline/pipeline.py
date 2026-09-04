@@ -26,7 +26,7 @@ class Pipeline:
     @property
     def geo(self):
         if self._geo is None:
-            self._geo = make_geo(self.cfg.geo_provider, self.cfg.google_maps_api_key)
+            self._geo = make_geo(self.cfg.geo_provider, self.cfg.google_geocoding_api_key, self.cfg.google_routes_api_key)
         return self._geo
 
     def _spend_yt(self):

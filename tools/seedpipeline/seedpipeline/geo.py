@@ -106,8 +106,9 @@ class GeoError(Exception):
 
 
 class GoogleGeo:
-    def __init__(self, api_key: str):
-        self.key = api_key
+    def __init__(self, geocoding_key: str, routes_key: str | None = None):
+        self.key = geocoding_key
+        self.routes_key = routes_key or geocoding_key
         self.calls = 0
 
     def geocode(self, label: str, prefecture: str) -> tuple[float, float] | None:
@@ -130,7 +131,7 @@ class GoogleGeo:
         if len(points) > 2:
             body["intermediates"] = [wp(p) for p in points[1:-1]]
         data = request("https://routes.googleapis.com/directions/v2:computeRoutes", method="POST", body=body,
-                       headers={"X-Goog-Api-Key": self.key, "X-Goog-FieldMask": "routes.polyline.encodedPolyline,routes.distanceMeters"})
+                       headers={"X-Goog-Api-Key": self.routes_key, "X-Goog-FieldMask": "routes.polyline.encodedPolyline,routes.distanceMeters"})
         self.calls += 1
         routes = data.get("routes") or []
         if not routes:
@@ -172,11 +173,11 @@ class OSMGeo:
         return decode_polyline(data["routes"][0]["geometry"])
 
 
-def make_geo(provider: str, google_key: str):
+def make_geo(provider: str, geocoding_key: str, routes_key: str | None = None):
     if provider == "google":
-        if not google_key:
-            raise SystemExit("GEO_PROVIDER=google には GOOGLE_MAPS_API_KEY が必要です")
-        return GoogleGeo(google_key)
+        if not geocoding_key or not (routes_key or geocoding_key):
+            raise SystemExit("GEO_PROVIDER=google には GOOGLE_MAPS_API_KEY（または GOOGLE_GEOCODING_API_KEY と GOOGLE_ROUTES_API_KEY）が必要です")
+        return GoogleGeo(geocoding_key, routes_key)
     return OSMGeo()
 
 

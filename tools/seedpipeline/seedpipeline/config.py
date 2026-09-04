@@ -12,8 +12,11 @@ class Config:
     gemini_api_key: str = field(default_factory=lambda: _env("GEMINI_API_KEY"))
     gemini_model: str = field(default_factory=lambda: _env("GEMINI_MODEL", "gemini-2.5-flash"))
     google_maps_api_key: str = field(default_factory=lambda: _env("GOOGLE_MAPS_API_KEY"))
+    # Geocoding と Routes でキーを分けた場合はこちら（未設定なら GOOGLE_MAPS_API_KEY を両方に使う）
+    google_geocoding_api_key: str = field(default_factory=lambda: _env("GOOGLE_GEOCODING_API_KEY") or _env("GOOGLE_MAPS_API_KEY"))
+    google_routes_api_key: str = field(default_factory=lambda: _env("GOOGLE_ROUTES_API_KEY") or _env("GOOGLE_MAPS_API_KEY"))
     # geo: "google"（Geocoding + Routes API。課金登録が必要だが無料枠あり）/ "osm"（OpenStreetMap。無料・キー不要・精度は落ちる）
-    geo_provider: str = field(default_factory=lambda: _env("GEO_PROVIDER", "google" if _env("GOOGLE_MAPS_API_KEY") else "osm"))
+    geo_provider: str = field(default_factory=lambda: _env("GEO_PROVIDER", "google" if (_env("GOOGLE_MAPS_API_KEY") or _env("GOOGLE_ROUTES_API_KEY")) else "osm"))
     db_path: str = field(default_factory=lambda: _env("SEED_DB", "out/seedpipeline.sqlite"))
 
     # 1 日の YouTube API 利用枠（既定 10,000 ユニット）のうち、このツールが使う上限
