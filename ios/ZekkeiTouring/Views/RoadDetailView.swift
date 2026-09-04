@@ -1,11 +1,14 @@
 import SwiftUI
 import MapKit
+import AVKit
 
 /// 絶景道の詳細。閲覧枠を使うまでは概要のみ表示
 struct RoadDetailView: View {
     @EnvironmentObject private var app: AppState
     @State var road: ZekkeiRoad
     @State private var ratings: [RoadRating] = []
+    @State private var media: [RoadMedia] = []
+    @State private var viewing: RoadMedia?
     @State private var showReport = false
     @State private var reportReason = ""
     @State private var showSignIn = false
@@ -54,6 +57,27 @@ struct RoadDetailView: View {
                     }
                     if let d = road.description, !d.isEmpty {
                         Section("紹介") { Text(d) }
+                    }
+                    if !media.isEmpty {
+                        Section("写真・動画（\(media.count)）") {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(media) { m in
+                                        MediaThumb(media: m, url: app.backend.thumbnailURL(for: m))
+                                            .onTapGesture { viewing = m }
+                                    }
+                                }
+                            }
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        }
+                    }
+                    let videoLinks = ratings.compactMap { $0.videoUrl }.compactMap { URL(string: $0) }
+                    if !videoLinks.isEmpty {
+                        Section("ライダーの紹介動画") {
+                            ForEach(videoLinks, id: \.absoluteString) { u in
+                                Link(destination: u) { Label(u.host ?? "動画", systemImage: "play.rectangle") }
+                            }
+                        }
                     }
                     if let y = road.youtubeUrl, let url = URL(string: y) {
                         Section("動画") {
@@ -128,9 +152,13 @@ struct RoadDetailView: View {
                 Button("キャンセル", role: .cancel) {}
             }
             .sheet(isPresented: $showSignIn) { SignInView() }
+            .sheet(item: $viewing) { m in
+                MediaViewer(media: m, url: app.backend.publicURL(bucket: m.bucket, path: m.storagePath))
+            }
             .task(id: unlocked) {
                 guard unlocked else { return }
                 ratings = (try? await app.backend.ratings(for: road.id)) ?? []
+                media = (try? await app.backend.media(for: road.id)) ?? []
                 if let fresh = try? await app.backend.road(id: road.id) { road = fresh }
             }
         }
@@ -168,6 +196,51 @@ struct RoadDetailView: View {
             UIApplication.shared.open(app)
         } else if let web = URL(string: "https://www.google.com/maps/dir/?api=1&origin=\(origin)&destination=\(dest)&travelmode=driving") {
             UIApplication.shared.open(web)
+        }
+    }
+}
+
+/// 一覧用のサムネイル
+struct MediaThumb: View {
+    let media: RoadMedia
+    let url: URL?
+    var body: some View {
+        AsyncImage(url: url) { phase in
+            switch phase {
+            case .success(let img): img.resizable().scaledToFill()
+            case .failure: Image(systemName: "photo").foregroundStyle(.secondary)
+            default: ProgressView()
+            }
+        }
+        .frame(width: 110, height: 110).clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(alignment: .bottomLeading) {
+            if media.kind == .video {
+                Image(systemName: "play.circle.fill").font(.title2).foregroundStyle(.white).shadow(radius: 2).padding(6)
+            }
+        }
+    }
+}
+
+/// 全画面表示。写真は拡大、動画は再生
+struct MediaViewer: View {
+    let media: RoadMedia
+    let url: URL?
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if media.kind == .video, let url {
+                    VideoPlayer(player: AVPlayer(url: url))
+                } else {
+                    AsyncImage(url: url) { phase in
+                        if case .success(let img) = phase { img.resizable().scaledToFit() } else { ProgressView() }
+                    }
+                }
+            }
+            .background(.black)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("閉じる") { dismiss() } } }
         }
     }
 }

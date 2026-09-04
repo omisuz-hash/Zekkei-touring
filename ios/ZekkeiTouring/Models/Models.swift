@@ -100,6 +100,8 @@ struct ZekkeiRoad: Codable, Identifiable, Hashable {
     var avgWinding: Double?
     var avgRestStops: Double?
     var avgParking: Double?
+    var mediaCount: Int?
+    var coverPath: String?
 
     var coordinates: [CLLocationCoordinate2D] { geojson.points }
     var lengthKmText: String { String(format: "%.1f km", lengthM / 1000) }
@@ -130,6 +132,8 @@ struct ZekkeiRoad: Codable, Identifiable, Hashable {
         case avgWinding = "avg_winding"
         case avgRestStops = "avg_rest_stops"
         case avgParking = "avg_parking"
+        case mediaCount = "media_count"
+        case coverPath = "cover_path"
     }
 }
 
@@ -209,6 +213,8 @@ struct RoadRating: Codable, Identifiable, Hashable {
     var season: String?
     var comment: String?
     var photoPaths: [String] = []
+    /// 紹介動画（YouTube 等）の URL
+    var videoUrl: String?
     var riddenAt: Date?
     var createdAt: Date?
 
@@ -233,6 +239,7 @@ struct RoadRating: Codable, Identifiable, Hashable {
         case restStops = "rest_stops"
         case parking, traffic, season, comment
         case photoPaths = "photo_paths"
+        case videoUrl = "video_url"
         case riddenAt = "ridden_at"
         case createdAt = "created_at"
     }

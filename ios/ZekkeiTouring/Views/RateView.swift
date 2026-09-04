@@ -17,6 +17,9 @@ struct RateView: View {
     @State private var traffic = 0
     @State private var season = ""
     @State private var comment = ""
+    @State private var videoURL = ""
+    @State private var pending: [PendingMedia] = []
+    @State private var uploadNote: String?
     @State private var isSubmitting = false
     @State private var overlap: (road: ZekkeiRoad, ratio: Double)?
     @State private var showOverlapChoice = false
@@ -51,13 +54,18 @@ struct RateView: View {
                 TextField("この道の見どころ、注意点など", text: $comment, axis: .vertical).lineLimit(3...6)
                 TextField("道の紹介（新規登録時のみ・任意）", text: $description, axis: .vertical).lineLimit(2...4)
             }
+            MediaPickerSection(pending: $pending)
+            Section("紹介動画の URL（任意）") {
+                TextField("https://www.youtube.com/watch?v=...", text: $videoURL)
+                    .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+            }
             Section {
                 Button {
                     Task { await submit() }
                 } label: {
                     HStack {
                         if isSubmitting { ProgressView() }
-                        Text("投稿する").frame(maxWidth: .infinity)
+                        Text(isSubmitting && !pending.isEmpty ? "写真・動画を送信中…" : "投稿する").frame(maxWidth: .infinity)
                     }
                 }
                 .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
@@ -78,8 +86,14 @@ struct RateView: View {
         .alert("投稿しました", isPresented: $done) {
             Button("OK") { dismiss() }
         } message: {
-            Text("閲覧枠の残り: \(app.creditBalance)")
+            Text([uploadNote, "閲覧枠の残り: \(app.creditBalance)"].compactMap { $0 }.joined(separator: "\n"))
         }
+    }
+
+    private var validatedVideoURL: String? {
+        let t = videoURL.trimmingCharacters(in: .whitespaces)
+        guard let u = URL(string: t), let host = u.host, host.contains("youtube.com") || host.contains("youtu.be") else { return nil }
+        return t
     }
 
     private func submit(attachTo existing: ZekkeiRoad? = nil, forceNew: Bool = false) async {
@@ -112,8 +126,16 @@ struct RateView: View {
                 scenery: scores[.scenery] ?? 3, rideQuality: scores[.rideQuality] ?? 3, winding: scores[.winding] ?? 3,
                 restStops: scores[.restStops] ?? 3, parking: scores[.parking] ?? 3,
                 traffic: traffic == 0 ? nil : traffic, season: season.isEmpty ? nil : season,
-                comment: comment.isEmpty ? nil : comment, riddenAt: ride.startedAt)
+                comment: comment.isEmpty ? nil : comment,
+                videoUrl: validatedVideoURL, riddenAt: ride.startedAt)
             try await app.backend.submitRating(rating)
+            // 添付の送信。失敗しても評価自体は成立させ、件数を知らせる
+            var failed = 0
+            for m in pending {
+                do { _ = try await app.backend.publish(m, roadId: road.id, ratingId: rating.id, userId: userId) }
+                catch { failed += 1 }
+            }
+            if failed > 0 { uploadNote = "写真・動画 \(failed) 件の送信に失敗しました" }
             var updated = ride
             updated.publishedRoadIds.append(road.id)
             app.store.save(updated)

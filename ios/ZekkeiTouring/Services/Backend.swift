@@ -26,6 +26,36 @@ protocol Backend: AnyObject {
 
     func report(targetType: String, targetId: UUID, reason: String) async throws
     func block(userId: UUID) async throws
+
+    // 写真・動画
+    func uploadMedia(data: Data, bucket: String, path: String, contentType: String) async throws
+    func publicURL(bucket: String, path: String) -> URL?
+    func createMedia(_ media: RoadMedia) async throws
+    func media(for roadId: UUID) async throws -> [RoadMedia]
+}
+
+extension Backend {
+    /// 圧縮済みの添付を保存し、台帳に登録する。パスは <road_id>/<media_id>.<ext>
+    func publish(_ pending: PendingMedia, roadId: UUID, ratingId: UUID?, userId: UUID) async throws -> RoadMedia {
+        let path = "\(roadId.uuidString)/\(pending.id.uuidString).\(pending.kind.fileExtension)"
+        try await uploadMedia(data: pending.data, bucket: pending.kind.bucket, path: path, contentType: pending.kind.contentType)
+        var thumbPath: String? = nil
+        if let t = pending.thumbnailData {
+            thumbPath = "\(roadId.uuidString)/\(pending.id.uuidString)_thumb.jpg"
+            try await uploadMedia(data: t, bucket: MediaKind.photo.bucket, path: thumbPath!, contentType: "image/jpeg")
+        }
+        let row = RoadMedia(id: pending.id, roadId: roadId, ratingId: ratingId, userId: userId, kind: pending.kind,
+                            bucket: pending.kind.bucket, storagePath: path, thumbnailPath: thumbPath,
+                            width: pending.width, height: pending.height, durationS: pending.durationS, bytes: pending.data.count)
+        try await createMedia(row)
+        return row
+    }
+
+    /// サムネイル優先の表示用 URL
+    func thumbnailURL(for media: RoadMedia) -> URL? {
+        if let t = media.thumbnailPath { return publicURL(bucket: MediaKind.photo.bucket, path: t) }
+        return publicURL(bucket: media.bucket, path: media.storagePath)
+    }
 }
 
 enum BackendError: LocalizedError {
@@ -107,6 +137,30 @@ final class MockBackend: Backend {
 
     func report(targetType: String, targetId: UUID, reason: String) async throws {}
     func block(userId: UUID) async throws {}
+
+    // 添付は端末の一時フォルダに保存して、その場所を URL として返す
+    private var mediaByRoad: [UUID: [RoadMedia]] = [:]
+    private let mediaDir: URL = {
+        let d = FileManager.default.temporaryDirectory.appendingPathComponent("mock-media", isDirectory: true)
+        try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        return d
+    }()
+
+    func uploadMedia(data: Data, bucket: String, path: String, contentType: String) async throws {
+        let url = mediaDir.appendingPathComponent(bucket).appendingPathComponent(path)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: url)
+    }
+    func publicURL(bucket: String, path: String) -> URL? {
+        mediaDir.appendingPathComponent(bucket).appendingPathComponent(path)
+    }
+    func createMedia(_ media: RoadMedia) async throws {
+        mediaByRoad[media.roadId, default: []].append(media)
+        if let i = roads.firstIndex(where: { $0.id == media.roadId }) {
+            roads[i].mediaCount = mediaByRoad[media.roadId]?.count
+        }
+    }
+    func media(for roadId: UUID) async throws -> [RoadMedia] { mediaByRoad[roadId] ?? [] }
 
     private static func parseEWKT(_ s: String) -> [CLLocationCoordinate2D] {
         guard let open = s.firstIndex(of: "("), let close = s.lastIndex(of: ")") else { return [] }

@@ -147,6 +147,29 @@ final class SupabaseBackend: Backend {
         try await client.from("reports").insert(ReportRow(reporter_id: id, target_type: targetType, target_id: targetId, reason: reason)).execute()
     }
 
+    // MARK: 写真・動画
+
+    func uploadMedia(data: Data, bucket: String, path: String, contentType: String) async throws {
+        _ = try requireUser()
+        _ = try await client.storage.from(bucket).upload(path, data: data, options: FileOptions(contentType: contentType))
+    }
+
+    func publicURL(bucket: String, path: String) -> URL? {
+        try? client.storage.from(bucket).getPublicURL(path: path)
+    }
+
+    func createMedia(_ media: RoadMedia) async throws {
+        try await client.from("road_media").insert(media).execute()
+    }
+
+    func media(for roadId: UUID) async throws -> [RoadMedia] {
+        try await client.from("road_media").select()
+            .eq("road_id", value: roadId.uuidString)
+            .eq("status", value: "published")
+            .order("created_at", ascending: false)
+            .execute().value
+    }
+
     private struct BlockRow: Encodable {
         let blocker_id: UUID
         let blocked_id: UUID
