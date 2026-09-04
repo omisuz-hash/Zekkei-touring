@@ -58,7 +58,7 @@ class Pipeline:
                     if not token:
                         break
             # 当たりの多いチャンネルは投稿一覧を直接たどる（検索の 1/100 のコスト）
-            for ch in self.store.channels_to_crawl():
+            for ch in self.store.channels_to_crawl(limit=self.cfg.channels_per_run):
                 pl = self.yt.channel_uploads_playlist(ch["id"])
                 if pl:
                     ids = self.yt.playlist_video_ids(pl, 200)
@@ -109,6 +109,7 @@ class Pipeline:
         max_va = self.cfg.max_video_analyses_per_run if video_analyses is None else video_analyses
         used_va = self.store.quota()["video_analyses"]
         n_roads = 0
+        self.rate_limited = False
         for v in self.store.videos_by_status("fetched", limit):
             v["chapters"] = json.loads(v["chapters"] or "[]")
             v["tags"] = json.loads(v["tags"] or "[]")
@@ -143,6 +144,7 @@ class Pipeline:
             except HTTPError as e:
                 if e.status == 429:
                     log("Gemini の利用枠に達したため抽出を中断します")
+                    self.rate_limited = True
                     break
                 if e.status == 404 and "model" in e.body.lower():
                     log(f"Gemini のモデル {self.cfg.gemini_model} が使えません。GEMINI_MODEL で別のモデルを指定してください: {e.body[:200]}")
@@ -152,9 +154,9 @@ class Pipeline:
         return n_roads
 
     # 4. 形状づけ ---------------------------------------------------------
-    def georeference(self, limit: int = 200) -> int:
+    def georeference(self, limit: int | None = None) -> int:
         ok = 0
-        for r in self.store.roads_pending_geo(limit):
+        for r in self.store.roads_pending_geo(limit or self.cfg.max_geo_per_run):
             r["via_labels"] = json.loads(r["via_labels"] or "[]")
             try:
                 g = build_geometry(self.geo, r)
@@ -199,17 +201,35 @@ class Pipeline:
         self.store.db.commit()
         return cur.rowcount
 
-    def run(self):
-        # 各段階は独立に失敗しうる。1 段階の失敗で後続（特に出力）を止めない
-        for title, fn in (("発見", self.discover), ("取得", self.fetch), ("抽出", self.extract),
-                          ("形状", self.georeference), ("統合", self.dedupe)):
-            log(f"== {title} ==")
-            try:
-                fn()
-            except SystemExit as e:
-                log(f"{title} をスキップ: {e}")
-            except Exception:
-                log(f"{title} で予期しないエラー。次の段階に進みます。\n{traceback.format_exc()}")
+    def _stage(self, title, fn):
+        log(f"== {title} ==")
+        try:
+            return fn() or 0
+        except SystemExit as e:
+            log(f"{title} をスキップ: {e}")
+        except Exception:
+            log(f"{title} で予期しないエラー。次の段階に進みます。\n{traceback.format_exc()}")
+        return 0
+
+    def run(self, until_empty: bool = False, max_rounds: int = 40):
+        """各段階を順に実行。until_empty なら、処理するものが無くなるか API の枠に当たるまで繰り返す"""
+        self._stage("発見", self.discover)
+        for i in range(max_rounds if until_empty else 1):
+            fetched = self._stage("取得", self.fetch)
+            extracted = self._stage("抽出", self.extract)
+            geo = self._stage("形状", self.georeference)
+            if not until_empty:
+                break
+            pending = self.store.stats()
+            remaining = pending.get("videos_discovered", 0) + pending.get("videos_fetched", 0) + pending.get("roads_pending", 0)
+            log(f"-- round {i + 1}: 取得 {fetched} / 抽出 {extracted} 本の道 / 形状 {geo} / 残り {remaining}")
+            if getattr(self, "rate_limited", False):
+                log("Gemini の利用枠待ち: 5 分後に再開します")
+                time.sleep(300)
+                continue
+            if remaining == 0 or (fetched == 0 and extracted == 0 and geo == 0):
+                break
+        self._stage("統合", self.dedupe)
         log("== 集計 ==")
         for k, v in sorted(self.store.stats().items()):
             log(f"  {k}: {v}")

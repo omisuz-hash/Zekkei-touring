@@ -144,7 +144,7 @@ def cmd_selftest():
 def main():
     ap = argparse.ArgumentParser(description="絶景道シード自動収集")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("run", help="全段階を実行")
+    r = sub.add_parser("run", help="全段階を実行"); r.add_argument("--until-empty", action="store_true", help="処理対象が無くなるか API の枠に当たるまで繰り返す")
     d = sub.add_parser("discover", help="検索で動画を集める")
     d.add_argument("--keywords", nargs="*")
     d.add_argument("--pages", type=int)
@@ -170,7 +170,7 @@ def main():
         return sys.exit(0 if cmd_check(cfg) else 1)
     p = Pipeline(cfg)
     if args.cmd == "run":
-        p.run(); cmd_export(p, "out", 0.5)
+        p.run(until_empty=args.until_empty); cmd_export(p, "out", 0.5)
     elif args.cmd == "discover":
         log(f"新規 {p.discover(args.keywords, args.pages)} 本")
     elif args.cmd == "fetch":

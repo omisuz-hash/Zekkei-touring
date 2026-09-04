@@ -20,11 +20,15 @@ class Config:
     db_path: str = field(default_factory=lambda: _env("SEED_DB", "out/seedpipeline.sqlite"))
 
     # 1 日の YouTube API 利用枠（既定 10,000 ユニット）のうち、このツールが使う上限
-    youtube_daily_budget: int = 9000
-    # 1 回の実行で処理する動画の上限
-    max_videos_per_run: int = 300
+    youtube_daily_budget: int = field(default_factory=lambda: int(_env("SEED_YT_BUDGET", "9000")))
+    # 1 回の実行で処理する動画の上限（環境変数 SEED_MAX_VIDEOS で変更可）
+    max_videos_per_run: int = field(default_factory=lambda: int(_env("SEED_MAX_VIDEOS", "300")))
     # 映像解析（Gemini に YouTube URL を渡す）を使う上限本数/実行。無料枠は 1 日 8 時間分が目安
-    max_video_analyses_per_run: int = 20
+    max_video_analyses_per_run: int = field(default_factory=lambda: int(_env("SEED_MAX_VIDEO_ANALYSES", "20")))
+    # 1 回の実行で形状を付ける道の上限
+    max_geo_per_run: int = field(default_factory=lambda: int(_env("SEED_MAX_GEO", "200")))
+    # 当たりチャンネルの投稿一覧を 1 回の実行でたどる数
+    channels_per_run: int = field(default_factory=lambda: int(_env("SEED_CHANNELS_PER_RUN", "5")))
     # 動画の長さ（秒）。短すぎる（Shorts）と長すぎる（生配信）は除外
     min_duration_s: int = 180
     max_duration_s: int = 3 * 3600
