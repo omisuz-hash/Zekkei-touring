@@ -174,7 +174,7 @@ class Store:
         q = f"select * from roads where geo_status in ({ph}) order by mentions desc, confidence desc"
         return [dict(r) for r in self.db.execute(q, statuses)]
 
-    def reset_geo(self, statuses: tuple[str, ...] = ("failed", "suspect")) -> int:
+    def reset_geo(self, statuses: tuple[str, ...] = ("failed", "suspect", "ok")) -> int:
         ph = ",".join("?" * len(statuses))
         cur = self.db.execute(f"update roads set geo_status='pending', geom=null, geo_error=null where geo_status in ({ph})", statuses)
         self.db.commit()

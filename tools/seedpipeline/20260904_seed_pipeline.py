@@ -44,13 +44,13 @@ def cmd_import_json(p: Pipeline, path: str) -> int:
     return n
 
 
-def cmd_export(p: Pipeline, out_dir: str, min_conf: float):
+def cmd_export(p: Pipeline, out_dir: str, min_conf: float, min_scenery: float = 2.5):
     stamp = date.today().strftime("%Y%m%d")
     os.makedirs(out_dir, exist_ok=True)
     sql = os.path.join(out_dir, f"{stamp}_seed_roads_auto.sql")
     gj = os.path.join(out_dir, f"{stamp}_roads_auto.geojson")
     rep = os.path.join(out_dir, f"{stamp}_seed_report.md")
-    n1 = export_sql(p.store, sql, min_confidence=min_conf)
+    n1 = export_sql(p.store, sql, min_confidence=min_conf, min_scenery=min_scenery)
     n2 = export_geojson(p.store, gj)
     export_report(p.store, rep)
     log(f"SQL {n1} 本 → {sql}")
@@ -152,14 +152,14 @@ def main():
     e = sub.add_parser("extract", help="Gemini で道を抽出"); e.add_argument("--limit", type=int); e.add_argument("--video-analyses", type=int)
     g = sub.add_parser("georeference", help="地図 API で形状を付ける"); g.add_argument("--limit", type=int, default=200)
     sub.add_parser("dedupe", help="重複統合")
-    x = sub.add_parser("export", help="SQL / GeoJSON / レポートを出力"); x.add_argument("--out", default="out"); x.add_argument("--min-confidence", type=float, default=0.5)
+    x = sub.add_parser("export", help="SQL / GeoJSON / レポートを出力"); x.add_argument("--out", default="out"); x.add_argument("--min-confidence", type=float, default=0.5); x.add_argument("--min-scenery", type=float, default=2.5)
     sub.add_parser("stats")
     i = sub.add_parser("import-json", help="tools/youtube の取得結果を取り込む"); i.add_argument("path")
     sub.add_parser("models", help="使える Gemini モデル")
     sub.add_parser("selftest")
     sub.add_parser("check", help="4 つのキーを検証")
     sub.add_parser("retry-failed", help="失敗した動画を再度抽出対象に戻す")
-    sub.add_parser("retry-geo", help="形状が失敗・要確認の道をやり直す")
+    rg = sub.add_parser("retry-geo", help="形状が失敗・要確認の道をやり直す"); rg.add_argument("--all", action="store_true", help="OK の道も含めて全てやり直す")
     sub.add_parser("reset-roads", help="抽出結果を全て消して抽出からやり直す（動画の取得結果は残る）")
     args = ap.parse_args()
 
@@ -182,13 +182,13 @@ def main():
     elif args.cmd == "dedupe":
         log(f"統合 {p.dedupe()} 組")
     elif args.cmd == "export":
-        cmd_export(p, args.out, args.min_confidence)
+        cmd_export(p, args.out, args.min_confidence, args.min_scenery)
     elif args.cmd == "stats":
         for k, v in sorted(p.store.stats().items()):
             print(f"{k}: {v}")
         print("quota:", p.store.quota())
     elif args.cmd == "retry-geo":
-        log(f"{p.retry_geo()} 本の形状をやり直し対象にしました")
+        log(f"{p.retry_geo(args.all)} 本の形状をやり直し対象にしました")
     elif args.cmd == "reset-roads":
         log(f"{p.reset_roads()} 本の道を消し、動画を抽出前に戻しました")
     elif args.cmd == "retry-failed":

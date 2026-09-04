@@ -10,8 +10,11 @@ def q(s) -> str:
     return "'" + str(s).replace("'", "''") + "'"
 
 
-def export_sql(store, path: str, min_confidence: float = 0.5, min_mentions: int = 1) -> int:
-    roads = [r for r in store.roads(geo_ok_only=True) if (r["confidence"] or 0) >= min_confidence and r["mentions"] >= min_mentions]
+def export_sql(store, path: str, min_confidence: float = 0.5, min_mentions: int = 1, min_scenery: float = 2.5) -> int:
+    # 景色の示唆が低い道（移動区間として抽出されたもの）は出力しない
+    roads = [r for r in store.roads(geo_ok_only=True)
+             if (r["confidence"] or 0) >= min_confidence and r["mentions"] >= min_mentions
+             and (r["scenery_hint"] is None or r["scenery_hint"] >= min_scenery)]
     lines = [f"-- 自動収集した絶景道シード（{date.today().isoformat()}）。{len(roads)} 本",
              "-- 生成元: tools/seedpipeline。形状は地図 API の経路（geometry_quality = routed）",
              "-- 前提: 20260903_init.sql, 20260904_media.sql, 20260904_road_videos.sql 適用済み", ""]

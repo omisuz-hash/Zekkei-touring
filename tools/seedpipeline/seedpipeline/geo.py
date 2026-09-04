@@ -3,8 +3,34 @@ google: Geocoding API + Routes API（課金登録が必要。無料枠あり）
 osm:    Nominatim + OSRM（無料・キー不要。1 秒 1 リクエストの礼儀を守る。精度と可用性は劣る）
 """
 import math
+import re
 import time
+from datetime import datetime, timedelta, timezone
 from .http import request, HTTPError
+
+JST = timezone(timedelta(hours=9))
+
+
+def daytime_departure() -> str:
+    """経路計算の出発時刻。夜間通行止め・冬季閉鎖で迂回させないため、
+    5〜10 月のうち直近の土曜 10:00（JST）を使う"""
+    now = datetime.now(JST)
+    d = now
+    if not (5 <= now.month <= 10):
+        d = datetime(now.year + (1 if now.month > 10 else 0), 5, 1, tzinfo=JST)
+    d = d + timedelta(days=(5 - d.weekday()) % 7 or 7)  # 次の土曜
+    d = d.replace(hour=10, minute=0, second=0, microsecond=0)
+    return d.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def clean_label(label: str) -> tuple[str, str]:
+    """「青山交差点（相模原市）」→ ("青山交差点", "相模原市")。括弧内が市区町村ならそれを返す"""
+    label = (label or "").strip()
+    m = re.search(r"[（(]([^）)]*)[）)]", label)
+    inner = m.group(1).strip() if m else ""
+    base = re.sub(r"[（(][^）)]*[）)]", "", label).strip()
+    muni = inner if re.search(r"(市|区|町|村)$", inner) else ""
+    return base or label, muni
 
 JP_BOUNDS = (122.0, 24.0, 154.0, 46.0)
 
@@ -123,13 +149,16 @@ class GoogleGeo:
         loc = res["geometry"]["location"]
         lng, lat = loc["lng"], loc["lat"]
         pref = next((c["long_name"] for c in res.get("address_components", []) if "administrative_area_level_1" in c.get("types", [])), "")
+        self.last_address = res.get("formatted_address", "")
         return (lng, lat, pref) if in_japan(lng, lat) else None
 
     def route(self, points: list[tuple[float, float]]) -> list[tuple[float, float]]:
         def wp(p):
             return {"location": {"latLng": {"latitude": p[1], "longitude": p[0]}}}
+        # 出発時刻を昼間に固定すると、夜間通行止めの道（奥多摩周遊道路など）を迂回せずに通る
         body = {"origin": wp(points[0]), "destination": wp(points[-1]), "travelMode": "DRIVE",
-                "routingPreference": "TRAFFIC_UNAWARE", "routeModifiers": {"avoidHighways": True},
+                "routingPreference": "TRAFFIC_AWARE", "departureTime": daytime_departure(),
+                "routeModifiers": {"avoidHighways": True},
                 "polylineQuality": "HIGH_QUALITY", "languageCode": "ja", "regionCode": "JP"}
         if len(points) > 2:
             body["intermediates"] = [wp(p) for p in points[1:-1]]
@@ -166,6 +195,7 @@ class OSMGeo:
         lng, lat = float(data[0]["lon"]), float(data[0]["lat"])
         addr = data[0].get("address", {})
         pref = addr.get("province") or addr.get("state") or ""
+        self.last_address = data[0].get("display_name", "")
         return (lng, lat, pref) if in_japan(lng, lat) else None
 
     def route(self, points: list[tuple[float, float]]) -> list[tuple[float, float]]:
@@ -207,13 +237,18 @@ def build_geometry(geo, road: dict) -> dict:
     pref_main = prefs[0] if prefs else ""
 
     def geocode_checked(label: str, municipality: str, required: bool):
+        label, inner_muni = clean_label(label)
+        municipality = municipality or inner_muni
         for muni in ([municipality, ""] if municipality else [""]):
             r = geo.geocode(label, pref_main, muni)
             if not r:
                 continue
             lng, lat, got_pref = r
-            if prefs and got_pref and _pref_core(got_pref) not in [_pref_core(p) for p in prefs]:
-                # 別の都道府県に飛んだ。市町村付きで失敗したら市町村なしを試し、それでも駄目なら不採用
+            addr = getattr(geo, "last_address", "") or ""
+            pref_ok = not prefs or not got_pref or _pref_core(got_pref) in [_pref_core(p) for p in prefs]
+            # 都道府県が違っても、指定した市区町村が住所に含まれていれば採用（県境をまたぐ道の対策）
+            muni_ok = bool(municipality) and municipality in addr
+            if not (pref_ok or muni_ok):
                 continue
             return (lng, lat)
         if required:
@@ -241,20 +276,30 @@ def build_geometry(geo, road: dict) -> dict:
         span = max(straight, 5_000) * 1.5
         points = [points[0]] + [p for p in points[1:-1] if haversine_m(points[0], p) < span and haversine_m(points[-1], p) < span] + [points[-1]]
 
+    approx = float(road.get("approx_length_km") or 0)
+
+    def plausibility(L: float) -> str | None:
+        if approx > 0:
+            ratio = (L / 1000) / approx
+            if ratio > 2.5 or ratio < 0.4:
+                return f"距離が想定と合いません（経路 {L / 1000:.0f} km / 想定 {approx:.0f} km）"
+        return None
+
     line = geo.route(points)
     L = length_m(line)
+    # 経由地が誤認で大回りしている場合は、始点・終点だけで引き直した方が想定距離に近いことがある
+    if len(points) > 2 and plausibility(L):
+        alt = geo.route([points[0], points[-1]])
+        La = length_m(alt)
+        if approx > 0 and abs(La / 1000 - approx) < abs(L / 1000 - approx):
+            line, L = alt, La
     if L < 500 or L > 300_000:
         raise GeoError(f"経路長が範囲外です: {L:.0f} m")
     if L > straight * 4 and len(points) == 2:
         raise GeoError("経路が遠回りすぎます（地点の誤認の可能性）")
     line = simplify(line, 15)
 
-    suspect = None
-    approx = float(road.get("approx_length_km") or 0)
-    if approx > 0:
-        ratio = (L / 1000) / approx
-        if ratio > 2.5 or ratio < 0.4:
-            suspect = f"距離が想定と合いません（経路 {L / 1000:.0f} km / 想定 {approx:.0f} km）"
+    suspect = plausibility(L)
     if L > MAX_PLAUSIBLE_M and not (approx > 0 and (L / 1000) / approx <= 1.5):
         suspect = f"1 本の道として長すぎます（{L / 1000:.0f} km）"
     return {"coords": line, "length_m": L, "curviness": curviness(line), "straight_m": straight,

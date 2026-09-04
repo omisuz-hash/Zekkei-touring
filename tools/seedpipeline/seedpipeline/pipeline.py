@@ -184,8 +184,8 @@ class Pipeline:
             log(f"統合: {drop} → {keep}（重なり {ratio:.0%}）")
         return n
 
-    def retry_geo(self) -> int:
-        return self.store.reset_geo()
+    def retry_geo(self, include_ok: bool = False) -> int:
+        return self.store.reset_geo(("failed", "suspect", "ok") if include_ok else ("failed", "suspect"))
 
     def reset_roads(self) -> int:
         return self.store.reset_roads()
