@@ -91,10 +91,11 @@ def cmd_check(cfg: Config) -> bool:
     if cfg.gemini_api_key:
         def gem():
             g = Gemini(cfg.gemini_api_key, cfg.gemini_model)
-            models = g.list_models()
-            if cfg.gemini_model not in models:
-                raise RuntimeError(f"モデル {cfg.gemini_model} が使えません。候補: {', '.join(models[:8])}")
-            return f"モデル {cfg.gemini_model} 利用可"
+            try:
+                return f"モデル {cfg.gemini_model} 応答: {g.ping()}"
+            except HTTPError as e:
+                models = [m for m in g.list_models() if "flash" in m or "pro" in m]
+                raise RuntimeError(f"モデル {cfg.gemini_model} が使えません（HTTP {e.status}）。GEMINI_MODEL で指定できる候補: {', '.join(models[:10])}")
         report("Gemini API", gem)
     else:
         ok = False; print("  NG   Gemini: GEMINI_API_KEY 未設定")
@@ -157,6 +158,7 @@ def main():
     sub.add_parser("models", help="使える Gemini モデル")
     sub.add_parser("selftest")
     sub.add_parser("check", help="4 つのキーを検証")
+    sub.add_parser("retry-failed", help="失敗した動画を再度抽出対象に戻す")
     args = ap.parse_args()
 
     if args.cmd == "selftest":
@@ -183,6 +185,8 @@ def main():
         for k, v in sorted(p.store.stats().items()):
             print(f"{k}: {v}")
         print("quota:", p.store.quota())
+    elif args.cmd == "retry-failed":
+        log(f"{p.retry_failed()} 本を抽出対象に戻しました")
     elif args.cmd == "import-json":
         log(f"取り込み {cmd_import_json(p, args.path)} 本")
     elif args.cmd == "models":

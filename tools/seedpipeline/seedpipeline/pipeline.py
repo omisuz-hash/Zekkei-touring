@@ -140,6 +140,9 @@ class Pipeline:
                 if e.status == 429:
                     log("Gemini の利用枠に達したため抽出を中断します")
                     break
+                if e.status == 404 and "model" in e.body.lower():
+                    log(f"Gemini のモデル {self.cfg.gemini_model} が使えません。GEMINI_MODEL で別のモデルを指定してください: {e.body[:200]}")
+                    break
                 self.store.set_status(v["id"], "failed", str(e)[:200])
                 log(f"失敗 {v['id']}: {e}")
         return n_roads
@@ -177,6 +180,11 @@ class Pipeline:
             n += 1
             log(f"統合: {drop} → {keep}（重なり {ratio:.0%}）")
         return n
+
+    def retry_failed(self) -> int:
+        cur = self.store.db.execute("update videos set status='fetched', reason=null where status='failed'")
+        self.store.db.commit()
+        return cur.rowcount
 
     def run(self):
         log("== 発見 ==");   self.discover()

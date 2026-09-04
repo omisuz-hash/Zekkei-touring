@@ -54,7 +54,7 @@ SYSTEM = """あなたは日本のバイクツーリング動画から「走っ�
 
 
 class Gemini:
-    def __init__(self, api_key: str, model: str = "gemini-2.5-flash"):
+    def __init__(self, api_key: str, model: str = "gemini-3.6-flash"):
         self.key = api_key
         self.model = model
         self.calls = 0
@@ -116,6 +116,16 @@ class Gemini:
 画面内の道路標識・案内標識・字幕・テロップ・地名の看板から、道の名前と番号、通過した地名を読み取ってください。
 道が登場する時刻を timestamp に入れてください。"""
         return self._generate([{"file_data": {"file_uri": video_url}}, {"text": text}], ROAD_SCHEMA)
+
+    def ping(self) -> str:
+        """モデルが実際に使えるかを最小の呼び出しで確かめる"""
+        body = {"contents": [{"role": "user", "parts": [{"text": "「OK」とだけ答えてください"}]}],
+                "generationConfig": {"temperature": 0, "maxOutputTokens": 50}}
+        data = request(f"{API}/models/{self.model}:generateContent", method="POST", body=body,
+                       headers={"x-goog-api-key": self.key}, timeout=60)
+        cands = data.get("candidates") or []
+        text = "".join(p.get("text", "") for p in cands[0]["content"].get("parts", [])) if cands else ""
+        return text.strip()[:20] or "(空の応答)"
 
     def list_models(self) -> list[str]:
         data = request(f"{API}/models", headers={"x-goog-api-key": self.key})

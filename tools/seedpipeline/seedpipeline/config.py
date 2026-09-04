@@ -10,7 +10,7 @@ def _env(name: str, default: str = "") -> str:
 class Config:
     youtube_api_key: str = field(default_factory=lambda: _env("YOUTUBE_API_KEY"))
     gemini_api_key: str = field(default_factory=lambda: _env("GEMINI_API_KEY"))
-    gemini_model: str = field(default_factory=lambda: _env("GEMINI_MODEL", "gemini-2.5-flash"))
+    gemini_model: str = field(default_factory=lambda: _env("GEMINI_MODEL", "gemini-3.6-flash"))
     google_maps_api_key: str = field(default_factory=lambda: _env("GOOGLE_MAPS_API_KEY"))
     # Geocoding と Routes でキーを分けた場合はこちら（未設定なら GOOGLE_MAPS_API_KEY を両方に使う）
     google_geocoding_api_key: str = field(default_factory=lambda: _env("GOOGLE_GEOCODING_API_KEY") or _env("GOOGLE_MAPS_API_KEY"))
