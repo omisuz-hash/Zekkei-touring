@@ -111,16 +111,19 @@ class GoogleGeo:
         self.routes_key = routes_key or geocoding_key
         self.calls = 0
 
-    def geocode(self, label: str, prefecture: str) -> tuple[float, float] | None:
-        q = f"{prefecture} {label}".strip()
+    def geocode(self, label: str, prefecture: str, municipality: str = "") -> tuple[float, float, str] | None:
+        """(lng, lat, 都道府県名) を返す。都道府県名は結果から読み取ったもの"""
+        q = f"{prefecture}{municipality} {label}".strip()
         data = request("https://maps.googleapis.com/maps/api/geocode/json",
                        params={"address": q, "region": "jp", "language": "ja", "components": "country:JP", "key": self.key})
         self.calls += 1
         if data.get("status") != "OK":
             return None
-        loc = data["results"][0]["geometry"]["location"]
+        res = data["results"][0]
+        loc = res["geometry"]["location"]
         lng, lat = loc["lng"], loc["lat"]
-        return (lng, lat) if in_japan(lng, lat) else None
+        pref = next((c["long_name"] for c in res.get("address_components", []) if "administrative_area_level_1" in c.get("types", [])), "")
+        return (lng, lat, pref) if in_japan(lng, lat) else None
 
     def route(self, points: list[tuple[float, float]]) -> list[tuple[float, float]]:
         def wp(p):
@@ -151,16 +154,19 @@ class OSMGeo:
             time.sleep(wait)
         self._last = time.time()
 
-    def geocode(self, label: str, prefecture: str) -> tuple[float, float] | None:
+    def geocode(self, label: str, prefecture: str, municipality: str = "") -> tuple[float, float, str] | None:
         self._pace()
         data = request("https://nominatim.openstreetmap.org/search",
-                       params={"q": f"{prefecture} {label}".strip(), "format": "json", "countrycodes": "jp", "limit": 1, "accept-language": "ja"},
+                       params={"q": f"{prefecture}{municipality} {label}".strip(), "format": "json", "countrycodes": "jp", "limit": 1,
+                               "accept-language": "ja", "addressdetails": 1},
                        headers={"User-Agent": "zekkei-touring-seedpipeline/1.0 (research; contact via repo)"})
         self.calls += 1
         if not data:
             return None
         lng, lat = float(data[0]["lon"]), float(data[0]["lat"])
-        return (lng, lat) if in_japan(lng, lat) else None
+        addr = data[0].get("address", {})
+        pref = addr.get("province") or addr.get("state") or ""
+        return (lng, lat, pref) if in_japan(lng, lat) else None
 
     def route(self, points: list[tuple[float, float]]) -> list[tuple[float, float]]:
         self._pace()
@@ -181,24 +187,60 @@ def make_geo(provider: str, geocoding_key: str, routes_key: str | None = None):
     return OSMGeo()
 
 
+def _pref_core(p: str) -> str:
+    p = (p or "").strip()
+    for suf in ("県", "府", "都"):
+        p = p.replace(suf, "")
+    return p.replace("北海道", "北海") if p == "北海道" else p
+
+
+# 通称で呼ばれる道は 1 本あたりこの距離を超えることはまれ。超えたら「要確認」に落とす
+MAX_PLAUSIBLE_M = 120_000
+
+
 def build_geometry(geo, road: dict) -> dict:
-    """始点・経由地・終点を座標にし、道路に沿った形状を取る。妥当性チェック付き"""
-    pref = road.get("prefecture", "")
-    labels = [road["start_label"]] + [v for v in road.get("via_labels", [])[:4] if v] + [road["end_label"]]
+    """始点・経由地・終点を座標にし、道路に沿った形状を取る。
+    返り値の suspect に理由が入っていれば「形状は取れたが要確認」"""
+    pref = road.get("prefecture", "") or ""
+    # 「神奈川県・山梨県」のように複数ある場合は先頭を代表にし、照合は全てで行う
+    prefs = [p for p in pref.replace("・", "/").replace("、", "/").split("/") if p]
+    pref_main = prefs[0] if prefs else ""
+
+    def geocode_checked(label: str, municipality: str, required: bool):
+        for muni in ([municipality, ""] if municipality else [""]):
+            r = geo.geocode(label, pref_main, muni)
+            if not r:
+                continue
+            lng, lat, got_pref = r
+            if prefs and got_pref and _pref_core(got_pref) not in [_pref_core(p) for p in prefs]:
+                # 別の都道府県に飛んだ。市町村付きで失敗したら市町村なしを試し、それでも駄目なら不採用
+                continue
+            return (lng, lat)
+        if required:
+            raise GeoError(f"座標にできません（都道府県不一致または未検出）: {label}")
+        return None
+
     points = []
-    for lb in labels:
-        p = geo.geocode(lb, pref)
-        if p:
-            points.append(p)
-        elif lb in (road["start_label"], road["end_label"]):
-            raise GeoError(f"座標にできません: {lb}")
-    if len(points) < 2:
-        raise GeoError("始点と終点が必要です")
+    start = geocode_checked(road["start_label"], road.get("start_municipality", ""), True)
+    points.append(start)
+    for v in road.get("via_labels", [])[:4]:
+        if v:
+            p = geocode_checked(v, "", False)
+            if p:
+                points.append(p)
+    end = geocode_checked(road["end_label"], road.get("end_municipality", ""), True)
+    points.append(end)
+
     straight = haversine_m(points[0], points[-1])
     if straight < 300:
         raise GeoError("始点と終点が近すぎます（同一地点の可能性）")
     if straight > 250_000:
         raise GeoError("始点と終点が離れすぎています（250km 超）")
+    # 経由地が始点〜終点の範囲から大きく外れていれば捨てる（誤認の経由地で大回りするのを防ぐ）
+    if len(points) > 2:
+        span = max(straight, 5_000) * 1.5
+        points = [points[0]] + [p for p in points[1:-1] if haversine_m(points[0], p) < span and haversine_m(points[-1], p) < span] + [points[-1]]
+
     line = geo.route(points)
     L = length_m(line)
     if L < 500 or L > 300_000:
@@ -206,5 +248,14 @@ def build_geometry(geo, road: dict) -> dict:
     if L > straight * 4 and len(points) == 2:
         raise GeoError("経路が遠回りすぎます（地点の誤認の可能性）")
     line = simplify(line, 15)
+
+    suspect = None
+    approx = float(road.get("approx_length_km") or 0)
+    if approx > 0:
+        ratio = (L / 1000) / approx
+        if ratio > 2.5 or ratio < 0.4:
+            suspect = f"距離が想定と合いません（経路 {L / 1000:.0f} km / 想定 {approx:.0f} km）"
+    if L > MAX_PLAUSIBLE_M and not (approx > 0 and (L / 1000) / approx <= 1.5):
+        suspect = f"1 本の道として長すぎます（{L / 1000:.0f} km）"
     return {"coords": line, "length_m": L, "curviness": curviness(line), "straight_m": straight,
-            "start": points[0], "end": points[-1]}
+            "start": points[0], "end": points[-1], "suspect": suspect}

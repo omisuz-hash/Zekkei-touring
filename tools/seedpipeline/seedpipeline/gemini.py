@@ -19,7 +19,10 @@ ROAD_SCHEMA = {
                     "road_number": {"type": "STRING", "description": "国道/県道番号があれば（例: 国道152号、県道25号）。無ければ空"},
                     "prefecture": {"type": "STRING"},
                     "start_label": {"type": "STRING", "description": "区間の始点となる地名・施設名。地図検索できる具体名"},
+                    "start_municipality": {"type": "STRING", "description": "始点の市区町村名（例: 奥多摩町、甲州市）。分からなければ空"},
                     "end_label": {"type": "STRING", "description": "区間の終点となる地名・施設名"},
+                    "end_municipality": {"type": "STRING", "description": "終点の市区町村名。分からなければ空"},
+                    "approx_length_km": {"type": "NUMBER", "description": "この区間のおおよその距離 km（一般知識で可）。分からなければ 0"},
                     "via_labels": {"type": "ARRAY", "items": {"type": "STRING"}, "description": "経由地（峠、道の駅、展望台など）最大4つ"},
                     "timestamp": {"type": "STRING", "description": "動画内でこの道が登場する時刻 mm:ss。不明なら空"},
                     "scenery_hint": {"type": "INTEGER", "description": "景色の良さの示唆 1-5"},
@@ -47,6 +50,9 @@ SYSTEM = """あなたは日本のバイクツーリング動画から「走っ�
 - 高速道路・都市部の移動区間は除外する。
 - 道の名前は通称（〇〇ライン、〇〇街道、〇〇みち）を優先し、国道/県道番号があれば road_number に入れる。
 - 始点・終点は Google マップで検索できる具体的な地名・施設名にする（例: 「道の駅たばやま」「柳沢峠」「白樺湖」）。市町村名だけでも可。
+- 始点・終点には必ず市区町村名（start_municipality / end_municipality）を添える。同名の地名が各地にあるため、これが無いと別の場所に飛ぶ。
+- 区間は「その道として走って気持ちいい部分」に絞る。国道全体（例: 国道152号の全長）ではなく、通称で呼ばれる区間や峠の前後にする。
+- approx_length_km には、その区間の一般に知られる距離を入れる（例: 奥多摩周遊道路 ≒ 20、ビーナスライン全線 ≒ 76）。
 - 経由地は峠・道の駅・展望台・橋など、道路の形状を決めるのに役立つ地点を選ぶ。
 - 1 つの動画に複数の道があれば全て列挙する。チャプターの時刻を timestamp に入れる。
 - 視聴者コメントで地元の呼び名や隣の穴場が語られていれば、動画の道の補足（name に併記）または別の道として confidence を下げて列挙する。

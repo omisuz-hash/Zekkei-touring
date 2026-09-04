@@ -19,7 +19,8 @@ create table if not exists roads (
   summary text, cautions text, season text,
   scenery_hint real, winding_hint real, surface_hint real, rest_hint real, parking_hint real,
   confidence real, mentions integer default 0,
-  geom text, length_m real, curviness real, geo_status text default 'pending', geo_error text,  -- pending / ok / failed
+  start_municipality text, end_municipality text, approx_length_km real,
+  geom text, length_m real, curviness real, geo_status text default 'pending', geo_error text,  -- pending / ok / suspect / failed
   created_at text, updated_at text
 );
 create table if not exists road_videos (
@@ -41,6 +42,12 @@ class Store:
         self.db = sqlite3.connect(path)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
+        # 既存 DB への列追加（あれば無視）
+        cols = {r[1] for r in self.db.execute("pragma table_info(roads)")}
+        for col, typ in (("start_municipality", "text"), ("end_municipality", "text"), ("approx_length_km", "real")):
+            if col not in cols:
+                self.db.execute(f"alter table roads add column {col} {typ}")
+        self.db.commit()
 
     # --- quota
     def quota(self) -> dict:
@@ -114,11 +121,13 @@ class Store:
         hints = ["scenery_hint", "winding_hint", "surface_hint", "rest_hint", "parking_hint"]
         if r is None:
             self.db.execute("""insert into roads(key,name,road_number,prefecture,start_label,end_label,via_labels,summary,cautions,season,
-                scenery_hint,winding_hint,surface_hint,rest_hint,parking_hint,confidence,mentions,created_at,updated_at)
-                values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,datetime('now'),datetime('now'))""",
+                scenery_hint,winding_hint,surface_hint,rest_hint,parking_hint,confidence,mentions,
+                start_municipality,end_municipality,approx_length_km,created_at,updated_at)
+                values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,datetime('now'),datetime('now'))""",
                             (key, road["name"], road.get("road_number", ""), road.get("prefecture", ""), road["start_label"], road["end_label"],
                              json.dumps(road.get("via_labels", []), ensure_ascii=False), road.get("summary", ""), road.get("cautions", ""),
-                             road.get("season", ""), *[road.get(h) for h in hints], road.get("confidence", 0)))
+                             road.get("season", ""), *[road.get(h) for h in hints], road.get("confidence", 0),
+                             road.get("start_municipality", ""), road.get("end_municipality", ""), road.get("approx_length_km") or None))
             road_id = self.db.execute("select id from roads where key=?", (key,)).fetchone()["id"]
         else:
             road_id = r["id"]
@@ -135,6 +144,12 @@ class Store:
             if road.get("cautions") and road["cautions"] not in (r["cautions"] or ""):
                 sets.append("cautions=?"); vals.append(((r["cautions"] or "") + " / " + road["cautions"]).strip(" /"))
             sets.append("confidence=max(confidence,?)"); vals.append(road.get("confidence", 0))
+            # 市町村・概算距離は未設定なら補う
+            for col in ("start_municipality", "end_municipality"):
+                if road.get(col) and not r[col]:
+                    sets.append(f"{col}=?"); vals.append(road[col])
+            if road.get("approx_length_km") and not r["approx_length_km"]:
+                sets.append("approx_length_km=?"); vals.append(road["approx_length_km"])
             self.db.execute(f"update roads set {', '.join(sets)}, updated_at=datetime('now') where id=?", (*vals, road_id))
         cur = self.db.execute("insert or ignore into road_videos(road_id,video_id,timestamp,evidence,confidence) values (?,?,?,?,?)",
                               (road_id, video_id, road.get("timestamp", ""), road.get("evidence", ""), road.get("confidence", 0)))
@@ -146,14 +161,33 @@ class Store:
     def roads_pending_geo(self, limit: int) -> list[dict]:
         return [dict(r) for r in self.db.execute("select * from roads where geo_status='pending' order by mentions desc, confidence desc limit ?", (limit,))]
 
-    def save_geo(self, road_id: int, geom: list | None, length_m: float | None, curv: float | None, error: str | None):
+    def save_geo(self, road_id: int, geom: list | None, length_m: float | None, curv: float | None, error: str | None, suspect: str | None = None):
+        status = "failed" if not geom else ("suspect" if suspect else "ok")
         self.db.execute("update roads set geom=?, length_m=?, curviness=?, geo_status=?, geo_error=?, updated_at=datetime('now') where id=?",
-                        (json.dumps(geom) if geom else None, length_m, curv, "ok" if geom else "failed", error, road_id))
+                        (json.dumps(geom) if geom else None, length_m, curv, status, error or suspect, road_id))
         self.db.commit()
 
-    def roads(self, geo_ok_only: bool = False) -> list[dict]:
-        q = "select * from roads" + (" where geo_status='ok'" if geo_ok_only else "") + " order by mentions desc, confidence desc"
-        return [dict(r) for r in self.db.execute(q)]
+    def roads(self, geo_ok_only: bool = False, statuses: tuple[str, ...] | None = None) -> list[dict]:
+        if statuses is None:
+            statuses = ("ok",) if geo_ok_only else ("pending", "ok", "suspect", "failed")
+        ph = ",".join("?" * len(statuses))
+        q = f"select * from roads where geo_status in ({ph}) order by mentions desc, confidence desc"
+        return [dict(r) for r in self.db.execute(q, statuses)]
+
+    def reset_geo(self, statuses: tuple[str, ...] = ("failed", "suspect")) -> int:
+        ph = ",".join("?" * len(statuses))
+        cur = self.db.execute(f"update roads set geo_status='pending', geom=null, geo_error=null where geo_status in ({ph})", statuses)
+        self.db.commit()
+        return cur.rowcount
+
+    def reset_roads(self) -> int:
+        n = self.db.execute("select count(*) from roads").fetchone()[0]
+        self.db.execute("delete from road_videos")
+        self.db.execute("delete from roads")
+        self.db.execute("update channels set hits=0, videos=0")
+        self.db.execute("update videos set status='fetched', reason=null, extracted=null where status in ('extracted','video_analyzed','failed')")
+        self.db.commit()
+        return n
 
     def road_videos(self, road_id: int) -> list[dict]:
         return [dict(r) for r in self.db.execute("""select rv.*, v.title, v.channel, v.view_count from road_videos rv join videos v on v.id=rv.video_id

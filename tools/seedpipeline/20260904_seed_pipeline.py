@@ -159,6 +159,8 @@ def main():
     sub.add_parser("selftest")
     sub.add_parser("check", help="4 つのキーを検証")
     sub.add_parser("retry-failed", help="失敗した動画を再度抽出対象に戻す")
+    sub.add_parser("retry-geo", help="形状が失敗・要確認の道をやり直す")
+    sub.add_parser("reset-roads", help="抽出結果を全て消して抽出からやり直す（動画の取得結果は残る）")
     args = ap.parse_args()
 
     if args.cmd == "selftest":
@@ -185,6 +187,10 @@ def main():
         for k, v in sorted(p.store.stats().items()):
             print(f"{k}: {v}")
         print("quota:", p.store.quota())
+    elif args.cmd == "retry-geo":
+        log(f"{p.retry_geo()} 本の形状をやり直し対象にしました")
+    elif args.cmd == "reset-roads":
+        log(f"{p.reset_roads()} 本の道を消し、動画を抽出前に戻しました")
     elif args.cmd == "retry-failed":
         log(f"{p.retry_failed()} 本を抽出対象に戻しました")
     elif args.cmd == "import-json":

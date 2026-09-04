@@ -45,9 +45,12 @@ def export_sql(store, path: str, min_confidence: float = 0.5, min_mentions: int 
 
 def export_geojson(store, path: str) -> int:
     feats = []
-    for r in store.roads(geo_ok_only=True):
-        feats.append({"type": "Feature", "geometry": {"type": "LineString", "coordinates": json.loads(r["geom"])},
-                      "properties": {k: r[k] for k in ("id", "name", "prefecture", "start_label", "end_label", "mentions", "confidence", "length_m", "curviness", "summary")}})
+    for r in store.roads(statuses=("ok", "suspect")):
+        props = {k: r[k] for k in ("id", "name", "prefecture", "start_label", "end_label", "mentions", "confidence", "length_m", "curviness", "summary", "geo_status", "geo_error")}
+        # geojson.io で色分けされる（要確認は赤）
+        props["stroke"] = "#e53935" if r["geo_status"] == "suspect" else "#1e88e5"
+        props["stroke-width"] = 4
+        feats.append({"type": "Feature", "geometry": {"type": "LineString", "coordinates": json.loads(r["geom"])}, "properties": props})
     with open(path, "w", encoding="utf-8") as f:
         json.dump({"type": "FeatureCollection", "features": feats}, f, ensure_ascii=False)
     return len(feats)
@@ -61,6 +64,7 @@ def export_report(store, path: str) -> None:
              "| 名前 | 都道府県 | 区間 | 言及 | 確度 | 距離 | 形状 |", "|---|---|---|---|---|---|---|"]
     for r in roads:
         L = f"{(r['length_m'] or 0) / 1000:.1f} km" if r["length_m"] else "-"
-        lines.append(f"| {r['name']} | {r['prefecture'] or ''} | {r['start_label']} 〜 {r['end_label']} | {r['mentions']} | {r['confidence'] or 0:.2f} | {L} | {r['geo_status']}{(' (' + (r['geo_error'] or '')[:40] + ')') if r['geo_status'] == 'failed' else ''} |")
+        note = f" ({(r['geo_error'] or '')[:50]})" if r['geo_status'] in ('failed', 'suspect') else ""
+        lines.append(f"| {r['name']} | {r['prefecture'] or ''} | {r['start_label']} 〜 {r['end_label']} | {r['mentions']} | {r['confidence'] or 0:.2f} | {L} | {r['geo_status']}{note} |")
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))

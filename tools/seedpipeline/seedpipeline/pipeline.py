@@ -154,9 +154,12 @@ class Pipeline:
             r["via_labels"] = json.loads(r["via_labels"] or "[]")
             try:
                 g = build_geometry(self.geo, r)
-                self.store.save_geo(r["id"], g["coords"], g["length_m"], g["curviness"], None)
-                ok += 1
-                log(f"形状 OK: {r['name']} {g['length_m'] / 1000:.1f} km")
+                self.store.save_geo(r["id"], g["coords"], g["length_m"], g["curviness"], None, g.get("suspect"))
+                if g.get("suspect"):
+                    log(f"形状 要確認: {r['name']} {g['length_m'] / 1000:.1f} km ({g['suspect']})")
+                else:
+                    ok += 1
+                    log(f"形状 OK: {r['name']} {g['length_m'] / 1000:.1f} km")
             except (GeoError, HTTPError) as e:
                 self.store.save_geo(r["id"], None, None, None, str(e)[:200])
                 log(f"形状 NG: {r['name']} ({e})")
@@ -180,6 +183,12 @@ class Pipeline:
             n += 1
             log(f"統合: {drop} → {keep}（重なり {ratio:.0%}）")
         return n
+
+    def retry_geo(self) -> int:
+        return self.store.reset_geo()
+
+    def reset_roads(self) -> int:
+        return self.store.reset_roads()
 
     def retry_failed(self) -> int:
         cur = self.store.db.execute("update videos set status='fetched', reason=null where status='failed'")
