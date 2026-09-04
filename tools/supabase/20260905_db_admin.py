@@ -39,8 +39,11 @@ def project_ref() -> str:
 
 def api(method: str, url: str, body: dict | None = None, headers: dict | None = None, timeout: int = 300):
     data = json.dumps(body).encode() if body is not None else None
+    # Supabase の管理 API は Python 標準の名乗り（User-Agent）を拒否するため、ツール名を名乗る
     req = urllib.request.Request(url, data=data, method=method,
-                                 headers={"Content-Type": "application/json", "Accept": "application/json", **(headers or {})})
+                                 headers={"Content-Type": "application/json", "Accept": "application/json",
+                                          "User-Agent": "zekkei-touring-db-admin/1.0 (+https://github.com/omisuz-hash/Zekkei-touring)",
+                                          **(headers or {})})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             text = r.read().decode("utf-8", "ignore")
@@ -66,20 +69,21 @@ def cmd_check():
     except Exception as e:
         ok = False
         print(f"  NG   管理 API: {e}\n       Personal Access Token（SUPABASE_ACCESS_TOKEN）が無効か、権限がありません")
-    try:
-        key = env("SUPABASE_PUBLISHABLE_KEY")
-        api("GET", f"{env('SUPABASE_URL')}/rest/v1/", headers={"apikey": key, "Authorization": f"Bearer {key}"})
-        print("  OK   アプリ用の鍵（Publishable / anon）")
-    except Exception as e:
-        ok = False
-        print(f"  NG   アプリ用の鍵: {e}")
-    try:
-        key = env("SUPABASE_SECRET_KEY")
-        api("GET", f"{env('SUPABASE_URL')}/rest/v1/", headers={"apikey": key, "Authorization": f"Bearer {key}"})
-        print("  OK   管理用の鍵（Secret / service_role）")
-    except Exception as e:
-        ok = False
-        print(f"  NG   管理用の鍵: {e}")
+    def key_ok(key: str) -> tuple[bool, str]:
+        # 表がまだ無い段階でも鍵の有効性だけを確かめる。401/403 なら鍵が無効、それ以外（404 等）は鍵は通っている
+        try:
+            api("GET", f"{env('SUPABASE_URL')}/rest/v1/zekkei_roads?select=id&limit=1",
+                headers={"apikey": key, "Authorization": f"Bearer {key}"})
+            return True, "表にアクセスできます"
+        except RuntimeError as e:
+            msg = str(e)
+            if msg.startswith("HTTP 401") or msg.startswith("HTTP 403"):
+                return False, msg
+            return True, "鍵は有効（表はまだ未作成）" if msg.startswith("HTTP 404") else msg[:80]
+    for label, name in (("アプリ用の鍵（Publishable / anon）", "SUPABASE_PUBLISHABLE_KEY"), ("管理用の鍵（Secret / service_role）", "SUPABASE_SECRET_KEY")):
+        good, msg = key_ok(env(name))
+        ok = ok and good
+        print(f"  {'OK' if good else 'NG'}   {label}: {msg}")
     print("結果:", "すべて OK" if ok else "問題あり")
     return ok
 
