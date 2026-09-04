@@ -7,13 +7,20 @@ KEYFILE="$HOME/.zekkei_supabase"
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
 
-ask() {
-  local var="$1" desc="$2" val
-  read -r -s -p "${desc}（入力は表示されません）: " val; echo
+ask() {  # 空のまま Enter を押したら聞き直す
+  local var="$1" desc="$2" val=""
+  while [[ -z "${val}" ]]; do
+    read -r -s -p "${desc}（入力は表示されません。貼り付けて Enter）: " val; echo
+    [[ -z "${val}" ]] && echo "  空です。もう一度入力してください。"
+  done
   printf 'export %s=%q\n' "${var}" "${val}" >> "$TMP"
 }
 echo "絶景道: Supabase 接続情報の登録"
-read -r -p "Project URL（例 https://abcd1234.supabase.co）: " url
+url=""
+while [[ -z "${url}" ]]; do
+  read -r -p "Project URL（例 https://abcd1234.supabase.co。こちらは表示されます）: " url
+  [[ -z "${url}" ]] && echo "  空です。もう一度入力してください。"
+done
 printf 'export SUPABASE_URL=%q\n' "${url}" >> "$TMP"
 ask SUPABASE_PUBLISHABLE_KEY "Publishable key（sb_publishable_... または anon の eyJ...）"
 ask SUPABASE_SECRET_KEY      "Secret key（sb_secret_... または service_role の eyJ...）"
