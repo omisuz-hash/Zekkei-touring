@@ -33,5 +33,11 @@ if ! git diff --cached --quiet; then
 else
   echo "結果に変更はありません"
 fi
+# 4. Supabase の接続情報があれば、新しい道をデータベースにも流し込む（seed_key で重複しない）
+if [[ -f "$HOME/.zekkei_supabase" ]]; then
+  # shellcheck disable=SC1090
+  source "$HOME/.zekkei_supabase"
+  (cd "$REPO/tools/supabase" && python3 20260905_db_admin.py seed && python3 20260905_db_admin.py stats) || echo "Supabase への流し込みに失敗しました"
+fi
 echo "== $(date '+%Y-%m-%d %H:%M') 終了 (exit $STATUS) =="
 exit $STATUS
