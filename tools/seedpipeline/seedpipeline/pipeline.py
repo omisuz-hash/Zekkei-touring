@@ -1,6 +1,7 @@
 """各段階の実行。run で全段階を順に回す"""
 import json
 import time
+import traceback
 from .config import Config
 from .store import Store
 from .youtube import YouTube, QuotaExceeded, parse_chapters, looks_like_touring
@@ -131,8 +132,11 @@ class Pipeline:
                     continue
                 for r in roads:
                     r.setdefault("prefecture", (res.get("prefectures") or [""])[0])
-                    self.store.upsert_road(road_key(r), r, v["id"])
-                    n_roads += 1
+                    try:
+                        self.store.upsert_road(road_key(r), r, v["id"])
+                        n_roads += 1
+                    except Exception as e:  # 1 本の道の不良データで全体を止めない
+                        log(f"  道の保存に失敗（スキップ）: {str(r.get('name'))[:30]} - {e}")
                 self.store.set_status(v["id"], status, f"{len(roads)} roads", res)
                 self.store.bump_channel(v["channel_id"], v["channel"], bool(roads))
                 log(f"抽出 {v['title'][:40]} → {len(roads)} 本")
@@ -196,11 +200,16 @@ class Pipeline:
         return cur.rowcount
 
     def run(self):
-        log("== 発見 ==");   self.discover()
-        log("== 取得 ==");   self.fetch()
-        log("== 抽出 ==");   self.extract()
-        log("== 形状 ==");   self.georeference()
-        log("== 統合 ==");   self.dedupe()
+        # 各段階は独立に失敗しうる。1 段階の失敗で後続（特に出力）を止めない
+        for title, fn in (("発見", self.discover), ("取得", self.fetch), ("抽出", self.extract),
+                          ("形状", self.georeference), ("統合", self.dedupe)):
+            log(f"== {title} ==")
+            try:
+                fn()
+            except SystemExit as e:
+                log(f"{title} をスキップ: {e}")
+            except Exception:
+                log(f"{title} で予期しないエラー。次の段階に進みます。\n{traceback.format_exc()}")
         log("== 集計 ==")
         for k, v in sorted(self.store.stats().items()):
             log(f"  {k}: {v}")

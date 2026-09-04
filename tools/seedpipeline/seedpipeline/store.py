@@ -37,6 +37,32 @@ create table if not exists geocache (q text primary key, lng real, lat real, pre
 """
 
 
+def _num(v, lo: float, hi: float, as_int: bool = False):
+    """LLM の出力を安全な数値に丸める（巨大な整数や文字列が来ても DB を壊さない）"""
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return None
+    if x != x:  # NaN
+        return None
+    x = max(lo, min(hi, x))
+    return int(round(x)) if as_int else x
+
+
+def clean_road(road: dict) -> dict:
+    r = dict(road)
+    for h in ("scenery_hint", "winding_hint", "surface_hint", "rest_hint", "parking_hint"):
+        r[h] = _num(r.get(h), 1, 5, as_int=True)
+    r["confidence"] = _num(r.get("confidence"), 0, 1) or 0.0
+    r["approx_length_km"] = _num(r.get("approx_length_km"), 0, 2000)
+    for k in ("name", "road_number", "prefecture", "start_label", "end_label", "start_municipality", "end_municipality",
+              "summary", "cautions", "season", "timestamp", "evidence"):
+        v = r.get(k)
+        r[k] = (str(v).strip()[:500] if v is not None else "")
+    r["via_labels"] = [str(v).strip()[:100] for v in (r.get("via_labels") or []) if v][:6]
+    return r
+
+
 class Store:
     def __init__(self, path: str):
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
@@ -118,6 +144,7 @@ class Store:
 
     # --- roads
     def upsert_road(self, key: str, road: dict, video_id: str) -> int:
+        road = clean_road(road)
         r = self.db.execute("select * from roads where key=?", (key,)).fetchone()
         hints = ["scenery_hint", "winding_hint", "surface_hint", "rest_hint", "parking_hint"]
         if r is None:
