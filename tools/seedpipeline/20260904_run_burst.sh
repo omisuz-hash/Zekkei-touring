@@ -17,10 +17,10 @@ LOG="out/logs/burst_$(date +%Y%m%d_%H%M).log"
 REPO="$(git rev-parse --show-toplevel)"
 {
   echo "== $(date '+%Y-%m-%d %H:%M') 集中実行 開始 =="
-  (cd "$REPO" && git pull --ff-only --quiet) || echo "git pull に失敗。既存のコードで続行"
+  (cd "$REPO" && git pull --no-rebase --no-edit --quiet) || (cd "$REPO" && git merge --abort 2>/dev/null; echo "git pull に失敗。既存のコードで続行")
   python3 20260904_seed_pipeline.py run --until-empty
   cd "$REPO"
   git add -f tools/seedpipeline/out/*.md tools/seedpipeline/out/*.geojson tools/seedpipeline/out/*.sql 2>/dev/null
-  git diff --cached --quiet || (git commit -q -m "シード集中収集 $(date '+%Y-%m-%d %H:%M')" && git push -q && echo "結果を push しました")
+  git diff --cached --quiet || (git commit -q -m "シード集中収集 $(date '+%Y-%m-%d %H:%M')" && (git pull --no-rebase --no-edit -q || git merge --abort); git push -q && echo "結果を push しました")
   echo "== $(date '+%Y-%m-%d %H:%M') 集中実行 終了 =="
 } 2>&1 | tee -a "$LOG"

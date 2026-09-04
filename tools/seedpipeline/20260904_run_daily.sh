@@ -19,7 +19,7 @@ fi
 source "$HOME/.zekkei_keys"
 
 # 1. コードの更新を取り込む（Claude 側の改善を自動で反映）
-(cd "$REPO" && git pull --ff-only --quiet) || echo "git pull に失敗しました（手元の変更と衝突）。既存のコードで続行します。"
+(cd "$REPO" && git pull --no-rebase --no-edit --quiet) || (cd "$REPO" && git merge --abort 2>/dev/null; echo "git pull に失敗しました（手元の変更と衝突）。既存のコードで続行します。")
 
 # 2. 収集
 python3 20260904_seed_pipeline.py run
@@ -29,7 +29,7 @@ STATUS=$?
 cd "$REPO"
 git add -f tools/seedpipeline/out/*.md tools/seedpipeline/out/*.geojson tools/seedpipeline/out/*.sql 2>/dev/null
 if ! git diff --cached --quiet; then
-  git commit -q -m "シード自動収集 $(date +%Y-%m-%d)" && git push -q && echo "結果を push しました"
+  git commit -q -m "シード自動収集 $(date +%Y-%m-%d)" && (git pull --no-rebase --no-edit -q || git merge --abort) ; git push -q && echo "結果を push しました"
 else
   echo "結果に変更はありません"
 fi
