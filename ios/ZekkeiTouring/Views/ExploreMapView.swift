@@ -1,7 +1,7 @@
 import SwiftUI
 import MapKit
 
-/// 周辺の絶景道を地図で探す
+/// 探す: 衛星調ダーク地図に絶景道を重ねる
 struct ExploreMapView: View {
     @EnvironmentObject private var app: AppState
     @State private var position: MapCameraPosition = .region(
@@ -11,65 +11,126 @@ struct ExploreMapView: View {
     @State private var selected: ZekkeiRoad?
     @State private var isLoading = false
     @State private var lastCenter: CLLocationCoordinate2D?
+    @State private var query = ""
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
-        NavigationStack {
+        ZStack(alignment: .top) {
             Map(position: $position, selection: $selected) {
                 UserAnnotation()
                 ForEach(roads) { road in
-                    MapPolyline(coordinates: road.coordinates)
-                        .stroke(color(for: road), lineWidth: app.isUnlocked(road) ? 6 : 4)
+                    let color = ZK.tier(scenery: road.avgScenery, count: road.ratingCount)
+                    let strong = (road.avgScenery ?? 0) >= 3.5 && road.ratingCount > 0
+                    // 外側グロー → 本線 → 中央ハイライト（絶景度 4.5 以上）
+                    if strong {
+                        MapPolyline(coordinates: road.coordinates).stroke(color.opacity(0.35), lineWidth: (road.avgScenery ?? 0) >= 4.5 ? 16 : 12)
+                    }
+                    MapPolyline(coordinates: road.coordinates).stroke(color, lineWidth: lineWidth(road))
+                    if (road.avgScenery ?? 0) >= 4.5 && road.ratingCount > 0 {
+                        MapPolyline(coordinates: road.coordinates).stroke(Color.white.opacity(0.7), lineWidth: 1.2)
+                    }
                     if let start = road.coordinates.first {
-                        Marker(road.name, systemImage: road.isSeed ? "play.rectangle" : "star.fill", coordinate: start)
-                            .tint(color(for: road))
-                            .tag(road)
+                        Annotation(road.name, coordinate: start, anchor: .bottomLeading) {
+                            CodeTag(code: road.shortCode, fromVideo: road.isFromVideos, muted: road.ratingCount == 0)
+                                .onTapGesture { selected = road }
+                        }
+                        .tag(road)
+                        .annotationTitles(.hidden)
                     }
                 }
             }
-            .mapControls {
-                MapUserLocationButton()
-                MapCompass()
-            }
+            .mapStyle(.hybrid(elevation: .realistic))
+            .mapControls { MapCompass() }
             .onMapCameraChange(frequency: .onEnd) { ctx in
                 Task { await load(center: ctx.region.center, span: ctx.region.span) }
             }
-            .sheet(item: $selected) { road in
-                RoadDetailView(road: road)
-                    .presentationDetents([.medium, .large])
-            }
-            .overlay(alignment: .top) {
-                if isLoading { ProgressView().padding(8).background(.thinMaterial, in: Capsule()).padding(.top, 8) }
-            }
-            .overlay(alignment: .bottomLeading) {
-                legend.padding()
-            }
-            .navigationTitle("絶景道を探す")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    CreditBadge()
+            .ignoresSafeArea()
+
+            // 上部: 検索バー + 閲覧枠
+            HStack(spacing: 8) {
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(ZK.caption)
+                    TextField("", text: $query, prompt: Text("地名・道名で探す").foregroundStyle(ZK.caption))
+                        .font(.system(size: 15)).foregroundStyle(.white)
+                        .submitLabel(.search).focused($searchFocused)
+                        .onSubmit { Task { await search() } }
+                    if !query.isEmpty {
+                        Button { query = ""; searchFocused = false } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(ZK.caption) }
+                    }
                 }
+                .padding(.horizontal, 14).frame(height: 44)
+                .glassPill(radius: 14)
+                CreditBadge()
             }
+            .padding(.horizontal, 12).padding(.top, 8)
+
+            // 左下: 凡例 / 右下: 現在地
+            VStack {
+                Spacer()
+                HStack(alignment: .bottom) {
+                    legend
+                    Spacer()
+                    Button {
+                        app.recorder.requestPermission()
+                        withAnimation { position = .userLocation(fallback: .automatic) }
+                    } label: {
+                        Image(systemName: "location").font(.system(size: 18, weight: .semibold)).foregroundStyle(.white)
+                            .frame(width: 44, height: 44).glassPill(radius: 14)
+                    }
+                }
+                .padding(.horizontal, 12).padding(.bottom, 12)
+            }
+            if isLoading {
+                ProgressView().tint(.white).padding(8).glassPill(radius: 999).padding(.top, 60)
+            }
+        }
+        .sheet(item: $selected) { road in
+            RoadDetailView(road: road)
+                .presentationDetents([.medium, .large])
+                .presentationBackground(Color(hex: 0x14181C).opacity(0.96))
+                .presentationDragIndicator(.visible)
         }
         .onAppear { app.recorder.requestPermission() }
     }
 
-    private var legend: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack { Circle().fill(.red).frame(width: 10, height: 10); Text("絶景度 4.5 以上") }
-            HStack { Circle().fill(.orange).frame(width: 10, height: 10); Text("絶景度 3.5 以上") }
-            HStack { Circle().fill(.gray).frame(width: 10, height: 10); Text("評価が少ない") }
-        }
-        .font(.caption2)
-        .padding(8)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8))
+    private func lineWidth(_ road: ZekkeiRoad) -> CGFloat {
+        let base: CGFloat = (road.avgScenery ?? 0) >= 4.5 && road.ratingCount > 0 ? 5 : ((road.avgScenery ?? 0) >= 3.5 && road.ratingCount > 0 ? 4 : 3.5)
+        return app.isUnlocked(road) ? base + 1.5 : base
     }
 
-    private func color(for road: ZekkeiRoad) -> Color {
-        guard let s = road.avgScenery, road.ratingCount > 0 else { return .gray }
-        if s >= 4.5 { return .red }
-        if s >= 3.5 { return .orange }
-        return .yellow
+    private var legend: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            CaptionLabel(text: "絶景度", size: 8)
+            legendRow(ZK.tier1, "4.5 以上")
+            legendRow(ZK.tier2, "3.5 以上")
+            legendRow(ZK.tier3, "評価が少ない")
+        }
+        .padding(12).glassPill(radius: 14)
+    }
+
+    private func legendRow(_ c: Color, _ t: String) -> some View {
+        HStack(spacing: 8) {
+            Capsule().fill(c).frame(width: 18, height: 3)
+            Text(t).font(.system(size: 11)).foregroundStyle(ZK.body)
+        }
+    }
+
+    private func search() async {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return }
+        searchFocused = false
+        // 読み込み済みの道名に一致すれば、その道へ
+        if let hit = roads.first(where: { $0.name.localizedCaseInsensitiveContains(q) }), let c = GeoUtils.center(of: hit.coordinates) {
+            withAnimation { position = .region(MKCoordinateRegion(center: c, span: MKCoordinateSpan(latitudeDelta: 0.3, longitudeDelta: 0.3))) }
+            selected = hit
+            return
+        }
+        let req = MKLocalSearch.Request()
+        req.naturalLanguageQuery = q
+        req.region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 36.5, longitude: 138), span: MKCoordinateSpan(latitudeDelta: 20, longitudeDelta: 20))
+        if let item = try? await MKLocalSearch(request: req).start().mapItems.first {
+            withAnimation { position = .region(MKCoordinateRegion(center: item.placemark.coordinate, span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5))) }
+        }
     }
 
     private func load(center: CLLocationCoordinate2D, span: MKCoordinateSpan) async {
@@ -86,19 +147,18 @@ struct ExploreMapView: View {
     }
 }
 
-/// 残りの閲覧枠バッジ
+/// 閲覧枠バッジ（縦積み: キャプション / 数値）
 struct CreditBadge: View {
     @EnvironmentObject private var app: AppState
     var body: some View {
-        Group {
+        VStack(spacing: 1) {
+            CaptionLabel(text: "閲覧枠", size: 8)
             if app.profile?.plan == .subscriber {
-                Label("無制限", systemImage: "infinity")
+                Image(systemName: "infinity").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
             } else {
-                Label("\(app.creditBalance)", systemImage: "ticket")
+                Text("\(app.creditBalance)").font(.zkNumber(17)).foregroundStyle(.white)
             }
         }
-        .font(.caption.bold())
-        .padding(.horizontal, 10).padding(.vertical, 5)
-        .background(.orange.opacity(0.15), in: Capsule())
+        .frame(width: 56, height: 44).glassPill(radius: 14)
     }
 }

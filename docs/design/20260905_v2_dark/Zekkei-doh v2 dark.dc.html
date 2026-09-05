@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><meta name="design_doc_mode" content="canvas"><style>html,body{background:#0B1A23;min-height:100%}body{margin:0;font-family:-apple-system,"SF Pro JP","Hiragino Sans","Hiragino Kaku Gothic ProN",system-ui,sans-serif;color:#E6ECEF;-webkit-font-smoothing:antialiased}a{color:#5FB4DD;text-decoration:none}a:hover{color:#8ECBE8;text-decoration:underline}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}input[type=range]{-webkit-appearance:none;appearance:none;outline:none;background:transparent}input[type=range]::-webkit-slider-runnable-track{height:3px;border-radius:2px;background:rgba(255,255,255,.18)}input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;border-radius:50%;background:#fff;margin-top:-12.5px;box-shadow:0 1px 4px rgba(0,0,0,.5)}input{font-family:inherit}input:focus{outline:none}input::placeholder{color:#5C6A73}</style></helmet>
+
+<div style="padding:48px 56px 24px;max-width:1100px">
+  <div style="font-size:12px;letter-spacing:.14em;color:#5FB4DD;font-weight:600">ZEKKEI-DO · V2 · DIRECTION SAMPLE · DARK</div>
+  <h1 style="margin:10px 0 14px;font-size:30px;font-weight:600;letter-spacing:-.01em;color:#fff">方向性の修正案 — ハードでクール、正確で堅実</h1>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;font-size:14px;line-height:1.9;color:#9AA7AD;max-width:960px">
+    <div><strong style="color:#E6ECEF">参考から取り入れたもの</strong><br>衛星写真調の地図の上に、濃いグレーの半透明カード。小さな英字キャプション＋太い等幅数字。空港コード風のタグは黄色ではなくディープブルー（#0F2A38 地 / #5FB4DD 線）で。</div>
+    <div><strong style="color:#E6ECEF">地図と線</strong><br>地形はノイズ生成の衛星調テクスチャ、道路は実線形で階層別に描画。絶景道はその道路線形に完全に重ね、Tidal blue の濃淡で絶景度を表現（明るい＝高評価）。</div>
+  </div>
+</div>
+
+<div style="display:flex;gap:36px;padding:0 56px 56px;align-items:flex-start;flex-wrap:wrap">
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="font-size:12px;color:#9AA7AD;letter-spacing:.06em">5.1 EXPLORE MAP · 衛星調地図 × 道路に重ねた絶景道</div>
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+      <div style="position:relative;height:100%;overflow:hidden;background:#111815">
+        <svg viewBox="0 0 402 874" width="402" height="874" style="position:absolute;inset:0">
+          <defs>
+            <filter id="terrain" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+              <feTurbulence type="fractalNoise" baseFrequency="0.006 0.008" numOctaves="6" seed="11" result="n"/>
+              <feColorMatrix in="n" type="matrix" values="0.22 0 0 0 0.05  0.26 0 0 0 0.08  0.16 0 0 0 0.05  0 0 0 0 1" result="c"/>
+              <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="3" seed="4" result="g"/>
+              <feColorMatrix in="g" type="matrix" values="0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0.35 0 0 0 0" result="grain"/>
+              <feBlend in="c" in2="grain" mode="overlay"/>
+            </filter>
+            <filter id="glow"><feGaussianBlur stdDeviation="5"/></filter>
+            <filter id="ts"><feDropShadow dx="0" dy="0.6" stdDeviation="1" flood-color="#000" flood-opacity=".9"/></filter>
+            <radialGradient id="ridge" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#2B3327"/><stop offset="1" stop-color="#2B3327" stop-opacity="0"/></radialGradient>
+            <radialGradient id="shade" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#05080A"/><stop offset="1" stop-color="#05080A" stop-opacity="0"/></radialGradient>
+            <radialGradient id="town" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#5B5A4E"/><stop offset="1" stop-color="#5B5A4E" stop-opacity="0"/></radialGradient>
+          </defs>
+          <rect width="402" height="874" filter="url(#terrain)"/>
+          <ellipse cx="300" cy="200" rx="140" ry="110" fill="url(#ridge)" opacity=".8"/>
+          <ellipse cx="230" cy="320" rx="120" ry="80" fill="url(#ridge)" opacity=".6"/>
+          <ellipse cx="60" cy="300" rx="120" ry="160" fill="url(#shade)" opacity=".7"/>
+          <ellipse cx="330" cy="520" rx="130" ry="100" fill="url(#shade)" opacity=".5"/>
+          <ellipse cx="90" cy="560" rx="90" ry="70" fill="url(#town)" opacity=".55"/>
+          <ellipse cx="150" cy="660" rx="80" ry="50" fill="url(#town)" opacity=".45"/>
+          <ellipse cx="70" cy="800" rx="90" ry="70" fill="url(#town)" opacity=".35"/>
+          <path d="M-10 830C50 780 120 830 170 874H-10Z" fill="#0A1A26"/>
+          <path d="M186 372C196 366 212 368 216 380S208 398 194 396 176 380 186 372Z" fill="#0B1F2D"/>
+          <path d="M-10 300C40 320 70 380 60 440S90 560 130 620 170 760 150 874" stroke="#0E2130" stroke-width="5" fill="none" opacity=".9"/>
+          <g stroke="#C9CDC6" stroke-width="1.1" fill="none" opacity=".38" stroke-linecap="round">
+            <path d="M0 180L70 190 120 230 170 220 230 260 300 250 360 290 402 280"/>
+            <path d="M40 120L90 160 110 260 90 340 130 400 110 470 160 540 150 600 210 650 230 740 300 780 402 760"/>
+            <path d="M250 0L260 80 300 130 320 200 290 290 340 360 330 430 380 480 402 560"/>
+            <path d="M0 500L60 520 100 560 170 570 220 600 260 590 320 630 360 700 402 690"/>
+            <path d="M180 874L200 800 170 720 120 690 60 700 0 680"/>
+            <path d="M330 540L300 500 240 470 200 500 150 480"/>
+            <path d="M60 60L140 90 200 70 270 110"/>
+            <path d="M40 560L80 590 70 640 110 660M90 520L130 540 140 590M60 780L110 760 150 790 130 840"/>
+          </g>
+          <g stroke="#D8DBD3" stroke-width="2" fill="none" opacity=".55" stroke-linecap="round">
+            <path d="M0 430L50 420 110 440 150 470 200 460 260 500 300 520 350 510 402 530"/>
+            <path d="M120 0L130 90 160 170 150 250 190 330 210 400"/>
+            <path d="M402 380L350 400 300 380 260 420 220 470"/>
+          </g>
+          <path d="M40 874C70 800 40 720 80 660S130 560 120 480 170 400 200 360 240 330 270 300 300 260 320 210 350 160 402 140" stroke="#E8E4D4" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".75"/>
+          <g fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".85">
+            <path d="M-10 760C60 730 120 750 180 700S260 660 330 640 402 600 420 590" stroke="#2A2E30" stroke-width="7"/>
+            <path d="M-10 760C60 730 120 750 180 700S260 660 330 640 402 600 420 590" stroke="#EDE9DA" stroke-width="3.5"/>
+          </g>
+          <!-- 絶景道 overlay on national road geometry -->
+          <path d="M120 480C170 400 200 360 240 330 270 300 300 260 320 210 350 160 402 140" stroke="#8ED4F5" stroke-width="16" fill="none" stroke-linecap="round" opacity=".38" filter="url(#glow)"/>
+          <path d="M120 480C170 400 200 360 240 330 270 300 300 260 320 210 350 160 402 140" stroke="#8ED4F5" stroke-width="5" fill="none" stroke-linecap="round"/>
+          <path d="M120 480C170 400 200 360 240 330 270 300 300 260 320 210 350 160 402 140" stroke="#fff" stroke-width="1.2" fill="none" stroke-linecap="round" opacity=".7"/>
+          <path d="M150 470L200 460 260 500 300 520 350 510" stroke="#1B9BD6" stroke-width="12" fill="none" stroke-linecap="round" opacity=".35" filter="url(#glow)"/>
+          <path d="M150 470L200 460 260 500 300 520 350 510" stroke="#1B9BD6" stroke-width="4" fill="none" stroke-linecap="round"/>
+          <path d="M330 540L300 500 240 470" stroke="#7C8B95" stroke-width="3.5" fill="none" stroke-linecap="round" opacity=".9"/>
+          <!-- markers as code tags -->
+          <g filter="url(#ts)">
+            <rect x="52" y="466" width="74" height="22" rx="6" fill="#0F2A38" stroke="#5FB4DD" stroke-width="1.2"/>
+            <path d="M62 472l7 5-7 5z" fill="#8ED4F5"/><text x="74" y="481.5" font-size="10" fill="#fff" font-weight="700" letter-spacing=".04em">VENUS</text>
+            <text x="90" y="503" font-size="10" fill="#E6ECEF" text-anchor="middle">ビーナスライン</text>
+          </g>
+          <g filter="url(#ts)">
+            <rect x="326" y="486" width="52" height="20" rx="6" fill="#0F2A38" stroke="#1B9BD6" stroke-width="1.2"/>
+            <path d="M334 490l1.7 3.5 3.9.5-2.8 2.7.7 3.9-3.5-1.8-3.5 1.8.7-3.9-2.8-2.7 3.9-.5z" fill="#5FB4DD"/><text x="345" y="500" font-size="9.5" fill="#fff" font-weight="700">R142</text>
+          </g>
+          <g filter="url(#ts)">
+            <rect x="320" y="544" width="52" height="20" rx="6" fill="#1A2126" stroke="#7C8B95" stroke-width="1.2"/>
+            <path d="M328 548l1.7 3.5 3.9.5-2.8 2.7.7 3.9-3.5-1.8-3.5 1.8.7-3.9-2.8-2.7 3.9-.5z" fill="#9AA7AD"/><text x="339" y="558" font-size="9.5" fill="#E6ECEF" font-weight="700">R152</text>
+          </g>
+          <g><rect x="228" y="712" width="44" height="16" rx="8" fill="#2E5A2A" stroke="#fff" stroke-opacity=".4"/><text x="250" y="724" font-size="9" fill="#fff" text-anchor="middle" font-weight="700">中央道</text></g>
+          <g font-size="11" fill="#F1F4F5" font-weight="500" filter="url(#ts)">
+            <text x="20" y="790">諏訪湖</text><text x="60" y="440">茅野</text><text x="222" y="372">白樺湖</text><text x="238" y="300">霧ヶ峰</text><text x="318" y="196">美ヶ原高原</text><text x="150" y="650">岡谷</text>
+          </g>
+          <g font-size="13" fill="#F1F4F5" opacity=".35" font-weight="600" letter-spacing=".2em"><text x="250" y="80">長 野 県</text></g>
+          <g><circle cx="90" cy="560" r="40" fill="#fff" opacity=".08"/><circle cx="90" cy="560" r="22" fill="#fff" opacity=".1"/><circle cx="90" cy="560" r="7" fill="#fff" stroke="#111" stroke-width="2"/></g>
+          <g font-size="9" fill="#F1F4F5" opacity=".6"><text x="14" y="866">Map · 地図データに基づく描画</text></g>
+        </svg>
+        <div style="position:absolute;top:62px;left:16px;right:16px;display:flex;gap:8px;align-items:center">
+          <div style="flex:1;height:44px;border-radius:14px;background:rgba(20,24,28,.82);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:8px;padding:0 14px;font-size:15px;color:#8F9BA3"><svg width="17" height="17" viewBox="0 0 18 18" fill="none" stroke="#8F9BA3" stroke-width="2"><circle cx="8" cy="8" r="6"/><path d="M12.5 12.5L17 17"/></svg>地名・道名で探す</div>
+          <div style="height:44px;padding:0 12px;border-radius:14px;background:rgba(20,24,28,.82);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1"><span style="font-size:8px;letter-spacing:.14em;color:#8F9BA3;font-weight:600;white-space:nowrap">閲覧枠</span><span style="font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;color:#fff">{{ tickets }}</span></div>
+        </div>
+        <div style="position:absolute;left:16px;bottom:120px;padding:10px 12px;border-radius:14px;background:rgba(20,24,28,.82);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.07);font-size:11px;color:#C5CED3;display:flex;flex-direction:column;gap:7px;white-space:nowrap;font-variant-numeric:tabular-nums">
+          <div style="font-size:8px;letter-spacing:.14em;color:#8F9BA3;font-weight:600">絶景度</div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="width:18px;height:3px;border-radius:2px;background:#8ED4F5;box-shadow:0 0 6px #8ED4F5"></span>4.5 以上</div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="width:18px;height:3px;border-radius:2px;background:#1B9BD6"></span>3.5 以上</div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="width:18px;height:3px;border-radius:2px;background:#7C8B95"></span>評価が少ない</div>
+        </div>
+        <div style="position:absolute;right:16px;bottom:120px;display:flex;flex-direction:column;gap:8px">
+          <div style="width:44px;height:44px;border-radius:14px;background:rgba(20,24,28,.82);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 20 20"><path d="M10 2l3 12-3-2.5L7 14z" fill="#fff"/><path d="M10 18l-3-12 3 2.5L13 6z" fill="#8F9BA3"/></svg></div>
+          <div style="width:44px;height:44px;border-radius:14px;background:rgba(20,24,28,.82);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#fff" stroke-width="1.8"><circle cx="10" cy="10" r="3"/><circle cx="10" cy="10" r="7"/><path d="M10 0v3M10 17v3M0 10h3M17 10h3"/></svg></div>
+        </div>
+        <div style="position:absolute;left:0;right:0;bottom:0;height:88px;padding:8px 16px 0;display:grid;grid-template-columns:repeat(4,1fr);background:rgba(14,17,20,.9);backdrop-filter:blur(24px);border-top:1px solid rgba(255,255,255,.06);font-size:10px;font-weight:500;color:#6E7C85">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;color:#fff"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7l7-3 6 3 7-3v15l-7 3-6-3-7 3z"/><path d="M10 4v15M16 7v15"/></svg>探す</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="13" cy="13" r="9"/><circle cx="13" cy="13" r="4" fill="currentColor"/></svg>記録</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h18M4 13h18M4 20h12"/></svg>走行記録</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="13" cy="9" r="5"/><path d="M3 24c1-6 5-8 10-8s9 2 10 8"/></svg>マイページ</div>
+        </div>
+      </div>
+    </x-import>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="font-size:12px;color:#9AA7AD;letter-spacing:.06em">5.2 ROAD DETAIL · カード（未解放 → 解放）</div>
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+      <div style="position:relative;height:100%;overflow:hidden;background:#111815">
+        <svg viewBox="0 0 402 874" width="402" height="874" style="position:absolute;inset:0">
+          <defs>
+            <filter id="terrain2" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+              <feTurbulence type="fractalNoise" baseFrequency="0.006 0.008" numOctaves="6" seed="11" result="n"/>
+              <feColorMatrix in="n" type="matrix" values="0.22 0 0 0 0.05  0.26 0 0 0 0.08  0.16 0 0 0 0.05  0 0 0 0 1" result="c"/>
+              <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="3" seed="4" result="g"/>
+              <feColorMatrix in="g" type="matrix" values="0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0.35 0 0 0 0" result="grain"/>
+              <feBlend in="c" in2="grain" mode="overlay"/>
+            </filter>
+            <filter id="glow2"><feGaussianBlur stdDeviation="5"/></filter>
+            <filter id="ts2"><feDropShadow dx="0" dy="0.6" stdDeviation="1" flood-color="#000" flood-opacity=".9"/></filter>
+          </defs>
+          <rect width="402" height="874" filter="url(#terrain2)"/>
+          <g stroke="#C9CDC6" stroke-width="1.1" fill="none" opacity=".38"><path d="M0 180L70 190 120 230 170 220 230 260 300 250 360 290 402 280"/><path d="M250 0L260 80 300 130 320 200 290 290 340 360"/><path d="M40 120L90 160 110 260 90 340 130 400"/></g>
+          <path d="M40 874C70 800 40 720 80 660S130 560 120 480 170 400 200 360 240 330 270 300 300 260 320 210 350 160 402 140" stroke="#E8E4D4" stroke-width="2.6" fill="none" stroke-linecap="round" opacity=".75"/>
+          <path d="M120 480C170 400 200 360 240 330 270 300 300 260 320 210 350 160 402 140" stroke="#8ED4F5" stroke-width="16" fill="none" stroke-linecap="round" opacity=".4" filter="url(#glow2)"/>
+          <path d="M120 480C170 400 200 360 240 330 270 300 300 260 320 210 350 160 402 140" stroke="#8ED4F5" stroke-width="5" fill="none" stroke-linecap="round"/>
+          <g filter="url(#ts2)"><rect x="52" y="466" width="74" height="22" rx="6" fill="#0F2A38" stroke="#5FB4DD" stroke-width="1.2"/><path d="M62 472l7 5-7 5z" fill="#8ED4F5"/><text x="74" y="481.5" font-size="10" fill="#fff" font-weight="700" letter-spacing=".04em">VENUS</text></g>
+          <g filter="url(#ts2)"><rect x="366" y="128" width="30" height="22" rx="6" fill="#0F2A38" stroke="#5FB4DD" stroke-width="1.2"/><path d="M373 134h7v10h-7zM373 134h3.5v3.5h-3.5zM376.5 137.5h3.5v3.5h-3.5zM373 141h3.5v3h-3.5z" fill="#fff"/></g>
+          <g font-size="11" fill="#F1F4F5" filter="url(#ts2)"><text x="238" y="300">霧ヶ峰</text><text x="300" y="196">美ヶ原高原</text><text x="60" y="440">茅野</text></g>
+        </svg>
+        <div style="position:absolute;top:62px;left:16px;right:16px;display:flex;justify-content:space-between">
+          <div style="width:40px;height:40px;border-radius:50%;background:rgba(20,24,28,.82);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center"><svg width="10" height="16" viewBox="0 0 12 20" fill="none"><path d="M10 2L2 10l8 8" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></div>
+          <div style="width:40px;height:40px;border-radius:50%;background:rgba(20,24,28,.82);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center"><svg width="18" height="4" viewBox="0 0 18 4"><circle cx="2" cy="2" r="2" fill="#fff"/><circle cx="9" cy="2" r="2" fill="#fff"/><circle cx="16" cy="2" r="2" fill="#fff"/></svg></div>
+        </div>
+        <div style="position:absolute;left:10px;right:10px;bottom:10px;background:rgba(20,24,28,.86);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.07);border-radius:22px;max-height:720px;display:flex;flex-direction:column">
+          <div style="width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,.2);margin:8px auto 0"></div>
+          <div style="overflow:auto;padding:14px 18px 20px;display:flex;flex-direction:column;gap:16px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+              <div style="min-width:0;flex:1">
+                <div style="display:flex;align-items:center;gap:8px"><span style="font-size:10px;font-weight:700;padding:3px 7px;border-radius:5px;background:#0F2A38;border:1px solid #5FB4DD;color:#fff;letter-spacing:.04em;white-space:nowrap">▶ VENUS</span><span style="font-size:10px;letter-spacing:.1em;color:#8F9BA3;white-space:nowrap">動画・編集部登録</span></div>
+                <div style="font-size:24px;font-weight:700;margin-top:8px;color:#fff;letter-spacing:-.01em">ビーナスライン</div>
+                <div style="font-size:12px;color:#8F9BA3;margin-top:2px">長野県</div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.04)">
+              <div><div style="font-size:9px;letter-spacing:.12em;color:#8F9BA3">始点</div><div style="font-size:17px;font-weight:700;color:#fff">茅野市</div></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:2px;white-space:nowrap"><div style="font-size:10px;color:#8F9BA3;font-variant-numeric:tabular-nums">58.4 km</div><div style="width:96px;height:1px;background:#5FB4DD;position:relative"><span style="position:absolute;left:0;top:-2px;width:5px;height:5px;border-radius:50%;background:#5FB4DD"></span><span style="position:absolute;right:0;top:-2px;width:5px;height:5px;border-radius:50%;background:#5FB4DD"></span></div><div style="font-size:10px;color:#8F9BA3">曲がり 68%</div></div>
+              <div style="text-align:right"><div style="font-size:9px;letter-spacing:.12em;color:#8F9BA3">終点</div><div style="font-size:17px;font-weight:700;color:#fff">美ヶ原高原</div></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+              <div style="padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04)"><div style="font-size:9px;letter-spacing:.12em;color:#8F9BA3">スコア</div><div style="font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;color:#8ED4F5;line-height:1.2">4.6</div><div style="font-size:10px;color:#8F9BA3;font-variant-numeric:tabular-nums">58 件</div></div>
+              <div style="padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04)"><div style="font-size:9px;letter-spacing:.12em;color:#8F9BA3">絶景度</div><div style="font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;color:#fff;line-height:1.2">4.8</div><div style="font-size:10px;color:#8F9BA3">最高評価</div></div>
+              <div style="padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04)"><div style="font-size:9px;letter-spacing:.12em;color:#8F9BA3">動画</div><div style="font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;color:#fff;line-height:1.2">12</div><div style="font-size:10px;color:#8F9BA3">YouTube</div></div>
+            </div>
+            <sc-if value="{{ locked }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <button onClick="{{ unlock }}" style="height:52px;border:0;border-radius:14px;background:#E9F6FC;color:#0B1A23;font-size:15px;font-weight:700;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer" style-hover="background:#fff">閲覧枠を 1 つ使って見る<span style="font-weight:500;opacity:.6;font-variant-numeric:tabular-nums">残り {{ tickets }}</span></button>
+                <div style="font-size:11px;color:#8F9BA3;text-align:center;line-height:1.7">絶景道を投稿すると閲覧枠が増えます。月額プランなら無制限です。<br><span style="color:#5FB4DD;font-weight:600">月額プランを見る</span></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ unlocked }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:12px;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.04)">
+                <sc-for list="{{ axes }}" as="a" hint-placeholder-count="5">
+                  <div style="display:grid;grid-template-columns:124px 1fr 36px;align-items:center;gap:10px;font-size:12px">
+                    <div style="color:#C5CED3;white-space:nowrap">{{ a.label }}</div>
+                    <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.1);overflow:hidden"><div style="height:100%;background:#5FB4DD;width:{{ a.pct }}"></div></div>
+                    <div style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums;color:#fff">{{ a.val }}</div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;gap:6px;flex-wrap:wrap"><span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;background:#0F2A38;border:1px solid #5FB4DD;color:#fff;white-space:nowrap">冬季閉鎖 11–4 月</span><span style="font-size:10px;font-weight:600;padding:3px 8px;border-radius:5px;border:1px solid rgba(255,255,255,.14);color:#C5CED3;white-space:nowrap">週末は観光渋滞</span></div>
+                <p style="margin:0;font-size:13px;line-height:1.9;color:#C5CED3">霧ヶ峰から美ヶ原高原へ続く標高 1,400〜2,000 m の高原道路。視界を遮るものがなく、早朝は雲海が見える。路面は良好で道幅も十分。</p>
+              </div>
+              <div style="display:flex;gap:6px">
+                <div style="flex:1;aspect-ratio:1;border-radius:10px;background:linear-gradient(160deg,#3A4B5A,#1C2B36 60%,#2A3A22);position:relative"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 14 14"><path d="M4 2l8 5-8 5z" fill="#fff"/></svg></div><div style="position:absolute;right:6px;bottom:6px;font-size:10px;color:#fff;font-variant-numeric:tabular-nums">0:28</div></div>
+                <div style="flex:1;aspect-ratio:1;border-radius:10px;background:linear-gradient(180deg,#2F4050,#3B4A2E)"></div>
+                <div style="flex:1;aspect-ratio:1;border-radius:10px;background:linear-gradient(180deg,#4A4032,#2A2419)"></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="font-size:9px;letter-spacing:.12em;color:#8F9BA3;font-weight:600">動画 · 12</div>
+                <div style="display:flex;gap:12px;align-items:center"><div style="width:96px;height:54px;border-radius:8px;background:linear-gradient(160deg,#3A4B5A,#2A3A22);flex:none;position:relative"><div style="position:absolute;right:4px;bottom:4px;font-size:10px;color:#fff;font-variant-numeric:tabular-nums">12:40—</div></div><div style="font-size:12px;line-height:1.5;color:#E6ECEF"><div style="font-weight:600">【絶景】ビーナスライン全線走ってきた 2026 秋</div><div style="color:#8F9BA3">モトブログ・タカシ</div></div></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="font-size:9px;letter-spacing:.12em;color:#8F9BA3;font-weight:600">コメント · 58</div>
+                <div style="padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.04);display:flex;flex-direction:column;gap:6px">
+                  <div style="display:flex;justify-content:space-between;font-size:12px"><span style="font-weight:600;color:#fff">テストライダー</span><span style="color:#8F9BA3;font-variant-numeric:tabular-nums">2026-05 · 早朝</span></div>
+                  <div style="font-size:11px;color:#5FB4DD;font-variant-numeric:tabular-nums">5 · 4 · 4 · 4 · 3</div>
+                  <div style="font-size:13px;line-height:1.8;color:#C5CED3">早朝は霧ヶ峰から雲海。道の駅美ヶ原の奥の駐車場は有料になりました</div>
+                </div>
+              </div>
+              <button style="height:50px;border:0;border-radius:14px;background:#E9F6FC;color:#0B1A23;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer">Google マップでこの区間へナビ</button>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+    </x-import>
+  </div>
+</div>
+
+<div style="display:flex;gap:36px;padding:0 56px 56px;align-items:flex-start;flex-wrap:wrap">
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="font-size:12px;color:#9AA7AD;letter-spacing:.06em">5.3 RECORD · 記録（屋外・グローブ）</div>
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+      <div style="position:relative;height:100%;overflow:hidden;background:#111815">
+        <svg viewBox="0 0 402 874" width="402" height="874" style="position:absolute;inset:0">
+          <defs><filter id="terrain3" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency="0.006 0.008" numOctaves="6" seed="23" result="n"/><feColorMatrix in="n" type="matrix" values="0.22 0 0 0 0.05  0.26 0 0 0 0.08  0.16 0 0 0 0.05  0 0 0 0 1" result="c"/><feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="3" seed="4" result="g"/><feColorMatrix in="g" type="matrix" values="0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0.35 0 0 0 0" result="grain"/><feBlend in="c" in2="grain" mode="overlay"/></filter><filter id="glow3"><feGaussianBlur stdDeviation="5"/></filter></defs>
+          <rect width="402" height="874" filter="url(#terrain3)"/>
+          <g stroke="#C9CDC6" stroke-width="1.1" fill="none" opacity=".38"><path d="M0 180L70 190 120 230 170 220 230 260 300 250 360 290 402 280"/><path d="M40 120L90 160 110 260 90 340 130 400 110 470 160 540"/><path d="M250 0L260 80 300 130 320 200 290 290 340 360"/></g>
+          <path d="M40 874C70 800 40 720 80 660S130 560 120 480 170 400 200 360 240 330 270 300 300 260 320 210" stroke="#E8E4D4" stroke-width="2.6" fill="none" stroke-linecap="round" opacity=".75"/>
+          <g opacity="{{ trailOpacity }}"><path d="M80 660S130 560 120 480 170 400 200 360" stroke="#8ED4F5" stroke-width="14" fill="none" stroke-linecap="round" opacity=".35" filter="url(#glow3)"/><path d="M80 660S130 560 120 480 170 400 200 360" stroke="#8ED4F5" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+          <g><circle cx="200" cy="360" r="40" fill="#fff" opacity=".08"/><circle cx="200" cy="360" r="22" fill="#fff" opacity=".1"/><circle cx="200" cy="360" r="7" fill="#fff" stroke="#111" stroke-width="2"/></g>
+          <g font-size="11" fill="#F1F4F5"><text x="238" y="300">霧ヶ峰</text><text x="60" y="440">茅野</text></g>
+        </svg>
+        <div style="position:absolute;top:62px;left:16px;right:16px;display:flex;justify-content:center"><div style="padding:8px 14px;border-radius:999px;background:rgba(20,24,28,.82);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.07);font-size:12px;color:#C5CED3;white-space:nowrap">{{ gpsText }}</div></div>
+        <div style="position:absolute;left:10px;right:10px;bottom:98px;padding:18px 18px 16px;background:rgba(20,24,28,.86);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.07);border-radius:22px;display:flex;flex-direction:column;gap:16px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+            <div style="padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04)"><div style="font-size:9px;letter-spacing:.12em;color:#8F9BA3">距離</div><div style="font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;color:#fff;line-height:1.2;letter-spacing:-.02em;white-space:nowrap">{{ recDist }}<span style="font-size:12px;font-weight:500;color:#8F9BA3"> km</span></div></div>
+            <div style="padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04)"><div style="font-size:9px;letter-spacing:.12em;color:#8F9BA3">時間</div><div style="font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;color:#fff;line-height:1.2;letter-spacing:-.02em">{{ recTime }}</div></div>
+            <div style="padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04)"><div style="font-size:9px;letter-spacing:.12em;color:#8F9BA3">状態</div><div style="font-size:16px;font-weight:700;margin-top:8px;display:flex;align-items:center;gap:6px;white-space:nowrap;color:{{ stateColor }}"><span style="width:8px;height:8px;border-radius:50%;background:currentColor;animation:{{ stateAnim }}"></span>{{ stateText }}</div></div>
+          </div>
+          <button onClick="{{ toggleRec }}" style="height:76px;border:0;border-radius:18px;font-size:22px;font-weight:700;font-family:inherit;cursor:pointer;background:{{ recBtnBg }};color:{{ recBtnFg }}">{{ recBtnText }}</button>
+          <div style="font-size:11px;color:#8F9BA3;line-height:1.7;text-align:center">記録は端末内に保存され、あなたが切り出した区間だけが公開されます</div>
+          <div style="display:block;padding:10px 12px;border-radius:12px;background:#0F2A38;border:1px solid rgba(95,180,221,.4);font-size:11px;color:#C5CED3;line-height:1.6">画面を閉じても記録を続けるには、位置情報の「常に許可」が必要です。 <span style="font-weight:700;color:#8ED4F5;white-space:nowrap">設定を開く</span></div>
+        </div>
+        <div style="position:absolute;left:0;right:0;bottom:0;height:88px;padding:8px 16px 0;display:grid;grid-template-columns:repeat(4,1fr);background:rgba(14,17,20,.9);backdrop-filter:blur(24px);border-top:1px solid rgba(255,255,255,.06);font-size:10px;font-weight:500;color:#6E7C85">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7l7-3 6 3 7-3v15l-7 3-6-3-7 3z"/><path d="M10 4v15M16 7v15"/></svg>探す</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;color:#fff"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="13" cy="13" r="9"/><circle cx="13" cy="13" r="4" fill="currentColor"/></svg>記録</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h18M4 13h18M4 20h12"/></svg>走行記録</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="13" cy="9" r="5"/><path d="M3 24c1-6 5-8 10-8s9 2 10 8"/></svg>マイページ</div>
+        </div>
+      </div>
+    </x-import>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="font-size:12px;color:#9AA7AD;letter-spacing:.06em">5.4 TRIM · 区間の切り出し</div>
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+      <div style="position:relative;height:100%;overflow:hidden;background:#111815">
+        <svg viewBox="0 0 402 874" width="402" height="874" style="position:absolute;inset:0">
+          <defs><filter id="terrain4" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency="0.006 0.008" numOctaves="6" seed="31" result="n"/><feColorMatrix in="n" type="matrix" values="0.22 0 0 0 0.05  0.26 0 0 0 0.08  0.16 0 0 0 0.05  0 0 0 0 1" result="c"/><feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="3" seed="4" result="g"/><feColorMatrix in="g" type="matrix" values="0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0.35 0 0 0 0" result="grain"/><feBlend in="c" in2="grain" mode="overlay"/></filter><filter id="glow4"><feGaussianBlur stdDeviation="5"/></filter></defs>
+          <rect width="402" height="874" filter="url(#terrain4)"/>
+          <g stroke="#C9CDC6" stroke-width="1.1" fill="none" opacity=".38"><path d="M0 180L70 190 120 230 170 220 230 260 300 250 360 290 402 280"/><path d="M40 120L90 160 110 260 90 340 130 400"/><path d="M0 500L60 520 100 560 170 570 220 600"/></g>
+          <path d="M60 470C100 440 130 400 160 380S220 330 260 300 320 250 350 200" stroke="#E8E4D4" stroke-width="2.6" fill="none" stroke-linecap="round" opacity=".75"/>
+          <circle cx="60" cy="470" r="46" fill="#fff" opacity=".07" stroke="#fff" stroke-opacity=".3" stroke-dasharray="4 4"/>
+          <path d="M60 470C100 440 130 400 160 380S220 330 260 300 320 250 350 200" stroke="#8F9BA3" stroke-width="4" stroke-linecap="round" fill="none" opacity=".7"/>
+          <path d="M60 470C100 440 130 400 160 380S220 330 260 300 320 250 350 200" stroke="#8ED4F5" stroke-width="16" stroke-linecap="round" fill="none" pathLength="100" stroke-dasharray="{{ trimDash }}" stroke-dashoffset="{{ trimOffset }}" opacity=".35" filter="url(#glow4)"/>
+          <path d="M60 470C100 440 130 400 160 380S220 330 260 300 320 250 350 200" stroke="#8ED4F5" stroke-width="6" stroke-linecap="round" fill="none" pathLength="100" stroke-dasharray="{{ trimDash }}" stroke-dashoffset="{{ trimOffset }}"/>
+          <g font-size="10" fill="#F1F4F5" opacity=".7"><text x="18" y="532">プライバシーゾーン · 自動除外</text></g>
+        </svg>
+        <div style="position:absolute;top:62px;left:16px;right:16px;display:flex;justify-content:space-between;align-items:center">
+          <div style="height:40px;padding:0 14px;border-radius:999px;background:rgba(20,24,28,.82);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;font-size:14px;color:#fff;font-weight:500">あとで</div>
+          <div style="height:40px;padding:0 14px;border-radius:999px;background:rgba(20,24,28,.82);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;font-size:12px;color:#C5CED3;font-variant-numeric:tabular-nums;white-space:nowrap">走行 31.2 km · 1:48</div>
+        </div>
+        <div style="position:absolute;left:10px;right:10px;bottom:10px;padding:18px 18px 22px;background:rgba(20,24,28,.86);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.07);border-radius:22px;display:flex;flex-direction:column;gap:14px">
+          <div><div style="font-size:19px;font-weight:700;color:#fff">公開する区間を選ぶ</div><div style="font-size:12px;color:#8F9BA3;margin-top:4px;line-height:1.6">自宅周辺（プライバシーゾーン）は自動で除外されています</div></div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;align-items:center;gap:12px;font-size:13px"><span style="font-size:9px;font-weight:700;padding:3px 6px;border-radius:5px;background:#0F2A38;border:1px solid #5FB4DD;color:#fff;letter-spacing:.06em;width:34px;text-align:center;flex:none">始点</span><input type="range" min="0" max="31.2" step="0.1" value="{{ trimStart }}" onChange="{{ setStart }}" style="flex:1;height:32px;padding:14px 0;margin:0"><span style="width:64px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:#fff;white-space:nowrap">{{ trimStartText }}</span></div>
+            <div style="display:flex;align-items:center;gap:12px;font-size:13px"><span style="font-size:9px;font-weight:700;padding:3px 6px;border-radius:5px;background:#0F2A38;border:1px solid #5FB4DD;color:#fff;letter-spacing:.06em;width:34px;text-align:center;flex:none">終点</span><input type="range" min="0" max="31.2" step="0.1" value="{{ trimEnd }}" onChange="{{ setEnd }}" style="flex:1;height:32px;padding:14px 0;margin:0"><span style="width:64px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:#fff;white-space:nowrap">{{ trimEndText }}</span></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div style="padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04)"><div style="font-size:9px;letter-spacing:.12em;color:#8F9BA3">選択区間</div><div style="font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;color:#8ED4F5;line-height:1.2;white-space:nowrap">{{ trimLen }}<span style="font-size:12px;color:#8F9BA3;font-weight:500"> km</span></div></div>
+            <div style="padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04)"><div style="font-size:9px;letter-spacing:.12em;color:#8F9BA3">曲がり具合</div><div style="font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;color:#fff;line-height:1.2;white-space:nowrap">{{ trimCurve }}<span style="font-size:12px;color:#8F9BA3;font-weight:500">%</span></div></div>
+          </div>
+          <button disabled="{{ trimTooShort }}" style="height:56px;border:0;border-radius:16px;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;background:{{ trimBtnBg }};color:{{ trimBtnFg }}">この区間を絶景道として評価する</button>
+          <sc-if value="{{ trimTooShort }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:#FF6B61;text-align:center;margin-top:-6px">500 m 以上の区間を選ぶと投稿できます</div></sc-if>
+        </div>
+      </div>
+    </x-import>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="font-size:12px;color:#9AA7AD;letter-spacing:.06em">5.5 RATE · 評価投稿</div>
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+      <div style="position:relative;height:100%;overflow:hidden;background:#0B0E11">
+        <div style="position:absolute;top:0;left:0;right:0;height:100px;padding:62px 16px 0;background:rgba(11,14,17,.9);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.06);display:flex;justify-content:space-between;align-items:center;z-index:5;font-size:16px"><span style="color:#5FB4DD;white-space:nowrap;flex:none">キャンセル</span><span style="font-weight:600;color:#fff;white-space:nowrap">評価を投稿</span><span style="width:70px;flex:none"></span></div>
+        <div style="position:absolute;inset:0;overflow:auto;padding:112px 12px 60px;display:flex;flex-direction:column;gap:18px">
+          <div style="background:rgba(255,255,255,.05);border-radius:16px;overflow:hidden;font-size:15px;color:#fff">
+            <div style="display:flex;align-items:center;min-height:48px;padding:0 16px;gap:12px;border-bottom:1px solid rgba(255,255,255,.06)"><span style="width:96px;color:#C5CED3;white-space:nowrap">道の名前<span style="color:#FF6B61"> *</span></span><input value="{{ fName }}" onChange="{{ setName }}" placeholder="例: ビーナスライン" style="flex:1;border:0;font-size:15px;background:transparent;padding:12px 0;min-width:0;color:#fff;font-weight:600"></div>
+            <div style="display:flex;align-items:center;min-height:48px;padding:0 16px;gap:12px;border-bottom:1px solid rgba(255,255,255,.06)"><span style="width:96px;color:#C5CED3;white-space:nowrap">始点の目印</span><input value="茅野市" style="flex:1;border:0;font-size:15px;background:transparent;padding:12px 0;min-width:0;color:#fff"></div>
+            <div style="display:flex;align-items:center;min-height:48px;padding:0 16px;gap:12px;border-bottom:1px solid rgba(255,255,255,.06)"><span style="width:96px;color:#C5CED3;white-space:nowrap">終点の目印</span><input value="美ヶ原高原" style="flex:1;border:0;font-size:15px;background:transparent;padding:12px 0;min-width:0;color:#fff"></div>
+            <div style="display:flex;align-items:center;min-height:48px;padding:0 16px;gap:12px"><span style="width:96px;color:#C5CED3">都道府県</span><span style="flex:1">長野県</span><span style="color:#5C6A73">›</span></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:9px;letter-spacing:.12em;color:#8F9BA3;padding:0 16px;font-weight:600">評価</div>
+            <div style="background:rgba(255,255,255,.05);border-radius:16px;overflow:hidden">
+              <sc-for list="{{ starRows }}" as="r" hint-placeholder-count="5">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 8px 8px 16px;border-bottom:1px solid rgba(255,255,255,.06);gap:8px">
+                  <div style="min-width:0;flex:1"><div style="font-size:14px;font-weight:600;color:#fff;white-space:nowrap">{{ r.label }}</div><div style="font-size:10px;color:#8F9BA3;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.sub }}</div></div>
+                  <div style="display:flex;flex:none">
+                    <sc-for list="{{ r.stars }}" as="s" hint-placeholder-count="5">
+                      <div onClick="{{ s.set }}" style="width:34px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 2l3 6.5 7 .9-5.2 4.8 1.4 7L12 17.8 5.8 21.2l1.4-7L2 9.4l7-.9z" fill="{{ s.fill }}"/></svg></div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:9px;letter-spacing:.12em;color:#8F9BA3;padding:0 16px;font-weight:600">おすすめの季節・時間帯</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;padding:0 4px">
+              <sc-for list="{{ seasons }}" as="sz" hint-placeholder-count="6"><div onClick="{{ sz.toggle }}" style="height:36px;padding:0 14px;border-radius:8px;display:flex;align-items:center;font-size:13px;font-weight:600;cursor:pointer;background:{{ sz.bg }};color:{{ sz.fg }};border:1px solid {{ sz.bd }}">{{ sz.label }}</div></sc-for>
+            </div>
+          </div>
+          <div style="background:rgba(255,255,255,.05);border-radius:16px;overflow:hidden;font-size:15px;color:#fff">
+            <div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06);color:#5C6A73;line-height:1.5;font-size:14px">コメント（季節・路面・駐車場など、走った人の一言）</div>
+            <div style="display:flex;align-items:center;min-height:48px;padding:0 16px;gap:12px"><span style="width:120px;color:#C5CED3;white-space:nowrap">紹介動画の URL</span><span style="flex:1;color:#5C6A73">任意</span></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:9px;letter-spacing:.12em;color:#8F9BA3;padding:0 16px;font-weight:600">写真・動画 <span style="font-variant-numeric:tabular-nums">2 / 5</span></div>
+            <div style="display:flex;gap:8px;padding:0 4px">
+              <div style="width:84px;height:84px;border-radius:12px;background:linear-gradient(160deg,#3A4B5A,#2A3A22);position:relative"><div style="position:absolute;right:6px;bottom:6px;font-size:10px;color:#fff;font-variant-numeric:tabular-nums">▶ 0:30</div></div>
+              <div style="width:84px;height:84px;border-radius:12px;background:linear-gradient(180deg,#4A4032,#2A2419)"></div>
+              <div style="width:84px;height:84px;border-radius:12px;border:1px dashed rgba(255,255,255,.2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:10px;color:#5FB4DD;text-align:center;line-height:1.3;font-weight:600"><span style="font-size:20px;line-height:1">＋</span>写真・動画<br>を追加</div>
+            </div>
+            <div style="font-size:10px;color:#8F9BA3;padding:0 4px;line-height:1.6">写真 5 枚まで、動画 1 本（30 秒・720p に自動圧縮）。長い動画は YouTube の URL 欄へ</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;padding:0 4px 20px">
+            <button onClick="{{ submit }}" style="height:54px;border:0;border-radius:16px;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;background:{{ submitBg }};color:{{ submitFg }}">投稿する</button>
+            <div style="font-size:11px;color:#8F9BA3;text-align:center;line-height:1.7">投稿 1 件につき閲覧枠が 3 つ増えます。<br>区間の形状と評価のみ公開されます</div>
+          </div>
+        </div>
+        <sc-if value="{{ dialog }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:20">
+            <div style="width:290px;border-radius:20px;background:rgba(28,32,36,.96);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.08);overflow:hidden;text-align:center;font-size:13px;color:#C5CED3">
+              <div style="padding:20px 16px 14px;line-height:1.6"><div style="font-size:17px;font-weight:700;margin-bottom:6px;color:#fff">同じ道が登録済みです</div>区間の <span style="font-variant-numeric:tabular-nums;color:#8ED4F5;font-weight:700">85%</span> が「ビーナスライン」と重なっています</div>
+              <div onClick="{{ addToExisting }}" style="min-height:48px;padding:10px 12px;line-height:1.3;display:flex;align-items:center;justify-content:center;border-top:1px solid rgba(255,255,255,.08);color:#fff;font-size:15px;font-weight:700;cursor:pointer">既存の「ビーナスライン」に評価を追加</div>
+              <div onClick="{{ addToExisting }}" style="min-height:48px;display:flex;align-items:center;justify-content:center;border-top:1px solid rgba(255,255,255,.08);color:#fff;font-size:15px;cursor:pointer">別の道として新規登録</div>
+              <div onClick="{{ closeDialog }}" style="min-height:48px;display:flex;align-items:center;justify-content:center;border-top:1px solid rgba(255,255,255,.08);color:#8F9BA3;font-size:15px;cursor:pointer">キャンセル</div>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ done }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;background:#0B0E11;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:20;padding:40px;text-align:center">
+            <div style="width:72px;height:72px;border-radius:50%;background:#0F2A38;border:1px solid #5FB4DD;display:flex;align-items:center;justify-content:center"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#8ED4F5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg></div>
+            <div style="font-size:22px;font-weight:700;color:#fff">投稿しました</div>
+            <div style="font-size:9px;letter-spacing:.12em;color:#8F9BA3;margin-top:10px">閲覧枠の残り</div>
+            <div style="font-size:48px;font-weight:700;font-variant-numeric:tabular-nums;color:#8ED4F5;line-height:1">{{ ticketsAfter }}</div>
+            <div onClick="{{ reset }}" style="margin-top:24px;color:#5FB4DD;font-size:15px;font-weight:600;cursor:pointer">閉じる</div>
+          </div>
+        </sc-if>
+      </div>
+    </x-import>
+  </div>
+</div>
+
+<div style="padding:0 56px 16px;font-size:12px;color:#9AA7AD;letter-spacing:.06em">補助画面</div>
+<div style="display:flex;gap:36px;padding:0 56px 56px;align-items:flex-start;flex-wrap:wrap">
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="font-size:12px;color:#9AA7AD;letter-spacing:.06em">5.6 SIGN IN</div>
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+      <div style="position:relative;height:100%;overflow:hidden;background:#111815">
+        <svg viewBox="0 0 402 874" width="402" height="874" style="position:absolute;inset:0">
+          <defs><filter id="terrain5" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency="0.004 0.006" numOctaves="6" seed="47" result="n"/><feColorMatrix in="n" type="matrix" values="0.22 0 0 0 0.05  0.26 0 0 0 0.08  0.16 0 0 0 0.05  0 0 0 0 1" result="c"/><feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="3" seed="4" result="g"/><feColorMatrix in="g" type="matrix" values="0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0.35 0 0 0 0" result="grain"/><feBlend in="c" in2="grain" mode="overlay"/></filter><filter id="glow5"><feGaussianBlur stdDeviation="6"/></filter><linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset=".3" stop-color="#0B0E11" stop-opacity="0"/><stop offset="1" stop-color="#0B0E11"/></linearGradient></defs>
+          <rect width="402" height="874" filter="url(#terrain5)"/>
+          <path d="M-20 420C60 380 120 300 200 260S330 160 420 120" stroke="#8ED4F5" stroke-width="18" fill="none" stroke-linecap="round" opacity=".35" filter="url(#glow5)"/>
+          <path d="M-20 420C60 380 120 300 200 260S330 160 420 120" stroke="#8ED4F5" stroke-width="5" fill="none" stroke-linecap="round"/>
+          <rect width="402" height="874" fill="url(#fade)"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:0 24px 56px;gap:12px">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px"><div style="width:56px;height:56px;border-radius:14px;background:#0B1A23;border:1px solid #5FB4DD;overflow:hidden;flex:none"><svg viewBox="0 0 56 56" width="56" height="56"><path d="M-6 42C12 26 22 46 36 30S50 20 62 14" stroke="#8ED4F5" stroke-width="6" stroke-linecap="round" fill="none"/></svg></div><div><div style="font-size:9px;letter-spacing:.16em;color:#5FB4DD;font-weight:700">ZEKKEI-DO</div><div style="font-size:30px;font-weight:700;color:#fff;letter-spacing:.04em;line-height:1.1">絶景道</div></div></div>
+          <div style="font-size:14px;color:#C5CED3;line-height:1.9">走って気持ちのいい道を、<br>ライダー同士で共有する道の口コミ地図</div>
+          <div style="font-size:11px;color:#8F9BA3;margin:10px 0 6px">収集するのは名前とメールアドレスのみです</div>
+          <div style="height:52px;border-radius:14px;background:#fff;color:#000;display:flex;align-items:center;justify-content:center;gap:8px;font-size:16px;font-weight:700"><svg width="16" height="19" viewBox="0 0 16 19" fill="#000"><path d="M13.3 10.1c0-2.2 1.8-3.3 1.9-3.3-1-1.5-2.6-1.7-3.2-1.7-1.4-.1-2.7.8-3.4.8s-1.8-.8-2.9-.8C3.5 5.1 1.3 7 1.3 10.5c0 1.1.2 2.2.6 3.4.5 1.6 2.5 5.4 4.5 5.3 1 0 1.8-.7 3.1-.7s2 .7 3.2.7c2-.1 3.8-3.5 4.3-5.1-2.7-1.3-3.7-3.7-3.7-4zM10.9 3.5c1-1.2.9-2.4.9-2.8-.9 0-2 .6-2.6 1.3-.6.7-1.1 1.8-.9 2.8 1 .1 2-.5 2.6-1.3z"/></svg>Apple でサインイン</div>
+          <div style="height:52px;border-radius:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:#fff;display:flex;align-items:center;justify-content:center;gap:8px;font-size:16px;font-weight:700"><span style="width:18px;height:18px;border-radius:50%;background:conic-gradient(#EA4335 0 25%,#FBBC05 0 50%,#34A853 0 75%,#4285F4 0)"></span>Google でログイン</div>
+          <div style="font-size:11px;color:#8F9BA3;margin-top:8px;line-height:1.7;text-align:center">続けることで <span style="color:#5FB4DD">利用規約</span> と <span style="color:#5FB4DD">プライバシーポリシー</span> に同意したものとみなします</div>
+        </div>
+      </div>
+    </x-import>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="font-size:12px;color:#9AA7AD;letter-spacing:.06em">5.6 RIDES · 走行記録一覧</div>
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+      <div style="position:relative;height:100%;background:#0B0E11;overflow:hidden">
+        <div style="padding:70px 16px 0;display:flex;justify-content:space-between;align-items:flex-end;gap:12px"><div style="flex:1;min-width:0"><div style="font-size:9px;letter-spacing:.16em;color:#5FB4DD;font-weight:700">RIDES</div><div style="font-size:32px;font-weight:700;color:#fff;letter-spacing:-.01em;line-height:1.1;white-space:nowrap">走行記録</div></div><div style="font-size:11px;color:#8F9BA3;font-variant-numeric:tabular-nums;white-space:nowrap">5 件 · 156.5 km</div></div>
+        <div style="margin:16px 12px;display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ rides }}" as="rd" hint-placeholder-count="5">
+            <div style="display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:16px;background:rgba(255,255,255,.05);font-size:14px">
+              <div style="width:56px;height:56px;border-radius:12px;background:#171C1A;flex:none;display:flex;align-items:center;justify-content:center"><svg width="40" height="40" viewBox="0 0 40 40"><path d="M6 30C14 26 16 14 24 14S32 8 36 6" stroke="{{ rd.color }}" stroke-width="3.5" stroke-linecap="round" fill="none"/></svg></div>
+              <div style="flex:1;min-width:0"><div style="display:flex;align-items:baseline;gap:6px;white-space:nowrap"><span style="font-weight:700;color:#fff;font-variant-numeric:tabular-nums;white-space:nowrap">{{ rd.date }}</span><span style="font-size:11px;color:#8F9BA3">{{ rd.day }}</span></div><div style="font-size:12px;color:#8F9BA3;margin-top:2px;font-variant-numeric:tabular-nums">{{ rd.meta }}</div></div>
+              <div style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;flex:none"><div style="font-weight:700;font-size:18px;color:{{ rd.color }}">{{ rd.score }}</div><div style="font-size:10px;color:#8F9BA3">{{ rd.posts }}</div></div>
+              <span style="color:#5C6A73;font-size:18px">›</span>
+            </div>
+          </sc-for>
+          <div style="font-size:11px;color:#5C6A73;text-align:center;margin-top:4px">左にスワイプで削除</div>
+        </div>
+        <div style="position:absolute;left:0;right:0;bottom:0;height:88px;padding:8px 16px 0;display:grid;grid-template-columns:repeat(4,1fr);background:rgba(14,17,20,.9);border-top:1px solid rgba(255,255,255,.06);font-size:10px;font-weight:500;color:#6E7C85">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7l7-3 6 3 7-3v15l-7 3-6-3-7 3z"/><path d="M10 4v15M16 7v15"/></svg>探す</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="13" cy="13" r="9"/><circle cx="13" cy="13" r="4" fill="currentColor"/></svg>記録</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;color:#fff"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h18M4 13h18M4 20h12"/></svg>走行記録</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="13" cy="9" r="5"/><path d="M3 24c1-6 5-8 10-8s9 2 10 8"/></svg>マイページ</div>
+        </div>
+      </div>
+    </x-import>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="font-size:12px;color:#9AA7AD;letter-spacing:.06em">5.6 PROFILE · マイページ</div>
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+      <div style="position:relative;height:100%;background:#0B0E11;overflow:hidden">
+        <div style="position:absolute;inset:0;overflow:auto;padding:70px 12px 110px;display:flex;flex-direction:column;gap:18px;font-size:15px;color:#fff">
+          <div style="padding:0 4px"><div style="font-size:9px;letter-spacing:.16em;color:#5FB4DD;font-weight:700">PROFILE</div><div style="font-size:32px;font-weight:700;letter-spacing:-.01em;line-height:1.1">マイページ</div></div>
+          <div style="background:rgba(255,255,255,.05);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:14px"><div style="width:48px;height:48px;border-radius:50%;background:#0F2A38;border:1px solid #5FB4DD;display:flex;align-items:center;justify-content:center;font-weight:700;color:#8ED4F5">テ</div><div style="flex:1"><div style="font-weight:700">テストライダー</div><div style="font-size:12px;color:#8F9BA3">投稿コース</div></div><span style="color:#5C6A73;font-size:18px">›</span></div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:9px;letter-spacing:.12em;color:#8F9BA3;padding:0 16px;font-weight:600">閲覧枠</div>
+            <div style="background:rgba(255,255,255,.05);border-radius:16px;overflow:hidden">
+              <div style="padding:16px;display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:center;border-bottom:1px solid rgba(255,255,255,.06)"><div><div style="font-size:9px;letter-spacing:.12em;color:#8F9BA3">残り</div><div style="font-size:40px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1;color:#8ED4F5">{{ tickets }}</div></div><div style="font-size:12px;color:#C5CED3;line-height:1.7">道の詳細を 1 本見るごとに 1 つ使います。絶景道を 1 本投稿すると 3 つ増えます。</div></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;min-height:48px;padding:0 16px;color:#5FB4DD;font-weight:600;font-size:14px;white-space:nowrap;gap:8px">月額プランを見る <span style="color:#8F9BA3;font-weight:400;font-variant-numeric:tabular-nums;font-size:12px;flex:1">無制限 · 380 円/月</span><span style="color:#5C6A73">›</span></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:9px;letter-spacing:.12em;color:#8F9BA3;padding:0 16px;font-weight:600">プライバシーゾーン</div>
+            <div style="background:rgba(255,255,255,.05);border-radius:16px;overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;min-height:48px;padding:0 16px;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px">中心<span style="color:#8F9BA3">自宅（設定済み）</span></div>
+              <div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;gap:4px;font-size:14px"><div style="display:flex;justify-content:space-between"><span>半径</span><span style="font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap;color:#8ED4F5">{{ radiusText }}</span></div><input type="range" min="300" max="3000" step="100" value="{{ radius }}" onChange="{{ setRadius }}" style="width:100%;height:32px;padding:14px 0;margin:0"><div style="display:flex;justify-content:space-between;font-size:10px;color:#8F9BA3;white-space:nowrap;font-variant-numeric:tabular-nums"><span>300 m</span><span>3,000 m</span></div></div>
+              <div style="display:flex;align-items:center;min-height:48px;padding:0 16px;color:#5FB4DD;font-weight:600;font-size:14px">現在地を中心に設定</div>
+            </div>
+            <div style="font-size:11px;color:#8F9BA3;padding:0 16px;line-height:1.7">この範囲内の走行軌跡は、切り出し時に自動で除外されます</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:9px;letter-spacing:.12em;color:#8F9BA3;padding:0 16px;font-weight:600">サポート</div>
+            <div style="background:rgba(255,255,255,.05);border-radius:16px;overflow:hidden;font-size:14px">
+              <div style="display:flex;align-items:center;justify-content:space-between;min-height:48px;padding:0 16px;border-bottom:1px solid rgba(255,255,255,.06)">問い合わせ<span style="color:#5C6A73">↗</span></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;min-height:48px;padding:0 16px;border-bottom:1px solid rgba(255,255,255,.06)">利用規約・プライバシーポリシー<span style="color:#5C6A73">↗</span></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;min-height:48px;padding:0 16px">通報とブロックについて<span style="color:#5C6A73">›</span></div>
+            </div>
+          </div>
+        </div>
+        <div style="position:absolute;left:0;right:0;bottom:0;height:88px;padding:8px 16px 0;display:grid;grid-template-columns:repeat(4,1fr);background:rgba(14,17,20,.9);border-top:1px solid rgba(255,255,255,.06);font-size:10px;font-weight:500;color:#6E7C85">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7l7-3 6 3 7-3v15l-7 3-6-3-7 3z"/><path d="M10 4v15M16 7v15"/></svg>探す</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="13" cy="13" r="9"/><circle cx="13" cy="13" r="4" fill="currentColor"/></svg>記録</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h18M4 13h18M4 20h12"/></svg>走行記録</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;color:#fff"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="13" cy="9" r="5"/><path d="M3 24c1-6 5-8 10-8s9 2 10 8"/></svg>マイページ</div>
+        </div>
+      </div>
+    </x-import>
+  </div>
+</div>
+
+<div style="padding:0 56px 80px;max-width:1000px">
+  <div style="font-size:12px;color:#9AA7AD;letter-spacing:.06em;margin-bottom:12px">PALETTE</div>
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;font-size:11px;color:#9AA7AD;font-variant-numeric:tabular-nums;line-height:1.5">
+    <div><div style="height:44px;background:rgba(20,24,28,.86);border:1px solid rgba(255,255,255,.07);border-radius:8px"></div>カード<br>#14181C 86%</div>
+    <div><div style="height:44px;background:#0F2A38;border:1px solid #5FB4DD;border-radius:8px"></div>タグ<br>#0F2A38 / #5FB4DD</div>
+    <div><div style="height:44px;background:#E9F6FC;border-radius:8px"></div>主ボタン<br>#E9F6FC</div>
+    <div><div style="height:44px;background:#8ED4F5;border-radius:8px"></div>絶景度 4.5+<br>#8ED4F5</div>
+    <div><div style="height:44px;background:#1B9BD6;border-radius:8px"></div>絶景度 3.5+<br>#1B9BD6</div>
+    <div><div style="height:44px;background:#7C8B95;border-radius:8px"></div>評価が少ない<br>#7C8B95</div>
+    <div><div style="height:44px;background:#8F9BA3;border-radius:8px"></div>キャプション<br>#8F9BA3</div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { tickets: 3, unlocked: false, rec: 'idle', secs: 0, dist: 0, trimStart: 2.1, trimEnd: 14.5, stars: { view: 3, ride: 3, wind: 3, rest: 3, park: 3 }, seasons: { '春': false, '夏': false, '秋': true, '冬': false, '早朝': true, '夕方': false }, fName: 'ビーナスライン', dialog: false, done: false, radius: 1000 };
+  componentDidMount() { this.t = setInterval(() => { if (this.state.rec === 'rec') this.setState(s => ({ secs: s.secs + 1, dist: s.dist + 0.011 })); }, 1000); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const s = this.state, TOTAL = 31.2;
+    const a = Math.min(s.trimStart, s.trimEnd), b = Math.max(s.trimStart, s.trimEnd), len = b - a;
+    const mm = Math.floor(s.secs / 60), ss = s.secs % 60, isRec = s.rec === 'rec';
+    const axesDef = [['絶景度', 4.8], ['走りやすさ', 4.3], ['ワインディング度', 4.2], ['休憩所', 4.5], ['絶景スポットの駐車', 3.9]];
+    const starDef = [['view', '絶景度', '景色の良さ・開放感'], ['ride', '走りやすさ', '路面の良さ・道幅'], ['wind', 'ワインディング度', 'カーブの多さ・楽しさ'], ['rest', '休憩所', '道の駅・売店・トイレ'], ['park', '絶景スポットの駐車', '景色の良い場所で停められるか']];
+    return {
+      tickets: s.tickets, ticketsAfter: s.tickets + 3, locked: !s.unlocked, unlocked: s.unlocked,
+      unlock: () => this.setState({ unlocked: true, tickets: Math.max(0, s.tickets - 1) }),
+      axes: axesDef.map(([label, val]) => ({ label, val: val.toFixed(1), pct: (val / 5 * 100) + '%' })),
+      recDist: s.dist.toFixed(1), recTime: mm + ':' + String(ss).padStart(2, '0'),
+      stateText: isRec ? '記録中' : (s.secs > 0 ? '一時停止' : '停止中'),
+      stateColor: isRec ? '#8ED4F5' : (s.secs > 0 ? '#FFD166' : '#8F9BA3'),
+      stateAnim: isRec ? 'pulse 1.4s infinite' : 'none',
+      trailOpacity: isRec || s.secs > 0 ? 1 : 0,
+      gpsText: isRec ? 'GPS 良好 · 現在地を追従中' : 'GPS を待機中',
+      recBtnBg: isRec ? '#FF453A' : '#E9F6FC', recBtnFg: isRec ? '#fff' : '#0B1A23', recBtnText: isRec ? '記録を終了' : '記録を開始',
+      toggleRec: () => this.setState(isRec ? { rec: 'idle' } : { rec: 'rec' }),
+      trimStart: s.trimStart, trimEnd: s.trimEnd,
+      setStart: e => this.setState({ trimStart: +e.target.value }), setEnd: e => this.setState({ trimEnd: +e.target.value }),
+      trimStartText: a.toFixed(1) + ' km', trimEndText: b.toFixed(1) + ' km',
+      trimLen: len.toFixed(1), trimCurve: Math.round(40 + (len / TOTAL) * 30),
+      trimTooShort: len < 0.5, trimBtnBg: len < 0.5 ? 'rgba(255,255,255,.12)' : '#E9F6FC', trimBtnFg: len < 0.5 ? '#8F9BA3' : '#0B1A23',
+      trimDash: (len / TOTAL * 100).toFixed(1) + ' 100', trimOffset: (-(a / TOTAL * 100)).toFixed(1),
+      fName: s.fName, setName: e => this.setState({ fName: e.target.value }),
+      starRows: starDef.map(([k, label, sub]) => ({ label, sub, stars: [1, 2, 3, 4, 5].map(n => ({ fill: n <= s.stars[k] ? '#8ED4F5' : 'rgba(255,255,255,.14)', set: () => this.setState({ stars: { ...s.stars, [k]: n } }) })) })),
+      seasons: Object.keys(s.seasons).map(k => { const on = s.seasons[k]; return { label: k, bg: on ? '#0F2A38' : 'transparent', fg: on ? '#fff' : '#C5CED3', bd: on ? '#5FB4DD' : 'rgba(255,255,255,.14)', toggle: () => this.setState({ seasons: { ...s.seasons, [k]: !on } }) }; }),
+      submitBg: s.fName.trim() ? '#E9F6FC' : 'rgba(255,255,255,.12)', submitFg: s.fName.trim() ? '#0B1A23' : '#8F9BA3',
+      submit: () => { if (s.fName.trim()) this.setState({ dialog: true }); },
+      closeDialog: () => this.setState({ dialog: false }), addToExisting: () => this.setState({ dialog: false, done: true }),
+      done: s.done, dialog: s.dialog, reset: () => this.setState({ done: false, tickets: s.tickets + 3 }),
+      radius: s.radius, radiusText: s.radius.toLocaleString() + ' m', setRadius: e => this.setState({ radius: +e.target.value }),
+      rides: [
+        { date: '2026-09-03', day: '水', meta: '58.4 km · 2:12', score: '4.6', posts: '投稿 1', color: '#8ED4F5' },
+        { date: '2026-08-24', day: '日', meta: '31.2 km · 1:48', score: '—', posts: '未投稿', color: '#8F9BA3' },
+        { date: '2026-08-10', day: '日', meta: '44.0 km · 1:55', score: '4.7', posts: '投稿 1', color: '#8ED4F5' },
+        { date: '2026-07-20', day: '日', meta: '10.1 km · 0:32', score: '3.4', posts: '投稿 1', color: '#7C8B95' },
+        { date: '2026-07-06', day: '日', meta: '12.8 km · 0:20', score: '4.9', posts: '投稿 1', color: '#8ED4F5' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

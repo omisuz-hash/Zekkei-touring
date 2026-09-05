@@ -3,6 +3,29 @@ import SwiftUI
 struct RootTabView: View {
     @EnvironmentObject private var app: AppState
 
+    init() {
+        // タブバー: 半透明ダーク（デザイン v2）
+        let tab = UITabBarAppearance()
+        tab.configureWithTransparentBackground()
+        tab.backgroundColor = UIColor(red: 14 / 255, green: 17 / 255, blue: 20 / 255, alpha: 0.9)
+        tab.shadowColor = UIColor.white.withAlphaComponent(0.06)
+        let inactive = UIColor(red: 110 / 255, green: 124 / 255, blue: 133 / 255, alpha: 1)
+        tab.stackedLayoutAppearance.normal.iconColor = inactive
+        tab.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: inactive, .font: UIFont.systemFont(ofSize: 10, weight: .medium)]
+        tab.stackedLayoutAppearance.selected.iconColor = .white
+        tab.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: UIColor.white, .font: UIFont.systemFont(ofSize: 10, weight: .medium)]
+        UITabBar.appearance().standardAppearance = tab
+        UITabBar.appearance().scrollEdgeAppearance = tab
+
+        let nav = UINavigationBarAppearance()
+        nav.configureWithTransparentBackground()
+        nav.backgroundColor = UIColor(red: 11 / 255, green: 14 / 255, blue: 17 / 255, alpha: 0.9)
+        nav.titleTextAttributes = [.foregroundColor: UIColor.white]
+        nav.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
+        UINavigationBar.appearance().standardAppearance = nav
+        UINavigationBar.appearance().scrollEdgeAppearance = nav
+    }
+
     var body: some View {
         TabView {
             ExploreMapView()
@@ -10,50 +33,17 @@ struct RootTabView: View {
             RecordView()
                 .tabItem { Label("記録", systemImage: "record.circle") }
             RidesListView()
-                .tabItem { Label("走行記録", systemImage: "list.bullet.rectangle") }
+                .tabItem { Label("走行記録", systemImage: "list.bullet") }
             ProfileView()
-                .tabItem { Label("マイページ", systemImage: "person.crop.circle") }
+                .tabItem { Label("マイページ", systemImage: "person") }
         }
+        .tint(.white)
+        .preferredColorScheme(.dark)
         .alert("エラー", isPresented: Binding(get: { app.lastError != nil }, set: { if !$0 { app.lastError = nil } })) {
             Button("OK") { app.lastError = nil }
         } message: {
             Text(app.lastError ?? "")
         }
-    }
-}
-
-/// 5段階の星入力
-struct StarPicker: View {
-    @Binding var value: Int
-    var body: some View {
-        HStack(spacing: 6) {
-            ForEach(1...5, id: \.self) { i in
-                Image(systemName: i <= value ? "star.fill" : "star")
-                    .foregroundStyle(i <= value ? Color.orange : Color.secondary)
-                    .font(.title3)
-                    .onTapGesture { value = i }
-            }
-        }
-    }
-}
-
-/// 平均点の表示
-struct ScoreBar: View {
-    let axis: RatingAxis
-    let value: Double?
-    var body: some View {
-        HStack {
-            Label(axis.title, systemImage: axis.symbol)
-                .frame(width: 180, alignment: .leading)
-            if let v = value {
-                ProgressView(value: v, total: 5).tint(.orange)
-                Text(String(format: "%.1f", v)).monospacedDigit().frame(width: 36, alignment: .trailing)
-            } else {
-                Text("評価なし").foregroundStyle(.secondary)
-                Spacer()
-            }
-        }
-        .font(.subheadline)
     }
 }
 
