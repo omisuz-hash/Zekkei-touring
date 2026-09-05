@@ -1,3 +1,7 @@
 .DS_Store
 __pycache__/
 *.pyc
+ios/Local.xcconfig
+ios/project.generated.yml
+ios/*.xcodeproj
+ios/build/

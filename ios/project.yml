@@ -40,17 +40,19 @@ targets:
         NSPhotoLibraryUsageDescription: 絶景道の写真を投稿するために写真ライブラリへアクセスします。
         NSCameraUsageDescription: 絶景道の写真を撮影して投稿するためにカメラを使用します。
         UIBackgroundModes: [location]
-        # Google ログインのコールバック用 URL スキーム。GoogleService の REVERSED_CLIENT_ID に置き換える
+        # Google ログインのコールバック用 URL スキーム（Local.xcconfig の GOOGLE_REVERSED_CLIENT_ID）
         CFBundleURLTypes:
-          - CFBundleURLSchemes: [com.googleusercontent.apps.REPLACE_WITH_REVERSED_CLIENT_ID]
-        # 接続先。値は Supabase ダッシュボードから取得し、ビルド設定で差し替える
+          - CFBundleURLSchemes: [$(GOOGLE_REVERSED_CLIENT_ID)]
+        # 接続先。値は Local.xcconfig（20260905_setup_xcode.sh が ~/.zekkei_supabase から生成。git 管理外）
         SupabaseURL: $(SUPABASE_URL)
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)
         GoogleClientID: $(GOOGLE_CLIENT_ID)
+    configFiles:
+      Debug: Local.xcconfig
+      Release: Local.xcconfig
     settings:
       base:
         SWIFT_VERSION: "5.10"
         TARGETED_DEVICE_FAMILY: "1"
-        SUPABASE_URL: https://REPLACE.supabase.co
-        SUPABASE_ANON_KEY: REPLACE
-        GOOGLE_CLIENT_ID: REPLACE.apps.googleusercontent.com
+        CODE_SIGN_STYLE: Automatic
+        PRODUCT_BUNDLE_IDENTIFIER: com.zekkeido.app
