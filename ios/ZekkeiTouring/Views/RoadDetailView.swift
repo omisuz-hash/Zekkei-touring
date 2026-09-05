@@ -8,6 +8,7 @@ struct RoadDetailView: View {
     @State var road: ZekkeiRoad
     @State private var ratings: [RoadRating] = []
     @State private var media: [RoadMedia] = []
+    @State private var videos: [RoadVideo] = []
     @State private var viewing: RoadMedia?
     @State private var showReport = false
     @State private var reportReason = ""
@@ -44,8 +45,30 @@ struct RoadDetailView: View {
                     if let c = road.curviness {
                         LabeledContent("曲がり具合（推定）", value: String(format: "%.0f%%", c * 100))
                     }
-                    if road.isSeed {
-                        Label("動画・編集部から登録された道", systemImage: "play.rectangle").font(.caption).foregroundStyle(.secondary)
+                    if road.isFromVideos {
+                        Label("ツーリング動画から登録された道", systemImage: "play.rectangle").font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let note = road.geometryNote {
+                        Text(note).font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+
+                // 動画は閲覧枠の外（無料側）に置く。YouTube の規約上、動画の視聴に条件を付けない
+                if !videos.isEmpty {
+                    Section("この道が登場する動画（\(videos.count)）") {
+                        ForEach(videos.prefix(5)) { v in
+                            if let url = v.playURL {
+                                Link(destination: url) { VideoRow(video: v) }
+                            }
+                        }
+                        if videos.count > 5 {
+                            NavigationLink("すべての動画を見る（\(videos.count)）") {
+                                List(videos) { v in
+                                    if let url = v.playURL { Link(destination: url) { VideoRow(video: v) } }
+                                }
+                                .navigationTitle("動画一覧")
+                            }
+                        }
                     }
                 }
 
@@ -79,7 +102,7 @@ struct RoadDetailView: View {
                             }
                         }
                     }
-                    if let y = road.youtubeUrl, let url = URL(string: y) {
+                    if videos.isEmpty, let y = road.youtubeUrl, let url = URL(string: y) {
                         Section("動画") {
                             Link(destination: url) {
                                 Label(road.youtubeChannel ?? "YouTube で見る", systemImage: "play.rectangle.fill")
@@ -154,6 +177,9 @@ struct RoadDetailView: View {
             .sheet(isPresented: $showSignIn) { SignInView() }
             .sheet(item: $viewing) { m in
                 MediaViewer(media: m, url: app.backend.publicURL(bucket: m.bucket, path: m.storagePath))
+            }
+            .task {
+                videos = (try? await app.backend.videos(for: road.id)) ?? []
             }
             .task(id: unlocked) {
                 guard unlocked else { return }
@@ -242,5 +268,30 @@ struct MediaViewer: View {
             .background(.black)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("閉じる") { dismiss() } } }
         }
+    }
+}
+
+/// 動画の 1 行（サムネイル・タイトル・チャンネル・登場時刻）
+struct VideoRow: View {
+    let video: RoadVideo
+    var body: some View {
+        HStack(spacing: 10) {
+            AsyncImage(url: video.thumbnailURL) { phase in
+                if case .success(let img) = phase { img.resizable().scaledToFill() } else { Color.secondary.opacity(0.2) }
+            }
+            .frame(width: 96, height: 54).clipped().clipShape(RoundedRectangle(cornerRadius: 6))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(video.title ?? "動画").font(.subheadline).lineLimit(2)
+                HStack(spacing: 6) {
+                    if let c = video.channel { Text(c).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                    if let t = video.timestampLabel, !t.isEmpty {
+                        Label(t, systemImage: "clock").font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "arrow.up.right.square").foregroundStyle(.secondary)
+        }
+        .foregroundStyle(.primary)
     }
 }

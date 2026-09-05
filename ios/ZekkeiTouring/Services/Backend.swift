@@ -19,6 +19,7 @@ protocol Backend: AnyObject {
     func createRoad(_ draft: RoadDraft) async throws -> ZekkeiRoad
     func submitRating(_ rating: RoadRating) async throws
     func ratings(for roadId: UUID) async throws -> [RoadRating]
+    func videos(for roadId: UUID) async throws -> [RoadVideo]
 
     func creditBalance() async throws -> Int
     func unlockedRoadIds() async throws -> Set<UUID>
@@ -124,6 +125,15 @@ final class MockBackend: Backend {
     }
 
     func ratings(for roadId: UUID) async throws -> [RoadRating] { ratingsByRoad[roadId] ?? [] }
+    func videos(for roadId: UUID) async throws -> [RoadVideo] {
+        guard let road = roads.first(where: { $0.id == roadId }), road.isSeed else { return [] }
+        return [
+            RoadVideo(id: 1, roadId: roadId, videoId: "0QZ8HaXH3TE", url: "https://www.youtube.com/watch?v=0QZ8HaXH3TE",
+                      title: "Z900RS 長野 夏のビーナスラインで心を整える【ツーリング】", channel: "RY×バイク旅", viewCount: 16378, timestampLabel: "09:38"),
+            RoadVideo(id: 2, roadId: roadId, videoId: "cwJTfPdLDj8", url: "https://www.youtube.com/watch?v=cwJTfPdLDj8",
+                      title: "【八ヶ岳】知ってる？信州の大自然を全力で楽しめる絶景ツーリング！", channel: "バイクで旅するまりさん", viewCount: 58346, timestampLabel: nil),
+        ]
+    }
     func creditBalance() async throws -> Int { balance }
     func unlockedRoadIds() async throws -> Set<UUID> { unlocked }
 

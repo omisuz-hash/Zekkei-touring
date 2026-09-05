@@ -109,6 +109,13 @@ final class SupabaseBackend: Backend {
             .execute().value
     }
 
+    func videos(for roadId: UUID) async throws -> [RoadVideo] {
+        try await client.from("road_videos").select()
+            .eq("road_id", value: roadId.uuidString)
+            .order("view_count", ascending: false)
+            .execute().value
+    }
+
     // MARK: 閲覧枠
 
     func creditBalance() async throws -> Int {

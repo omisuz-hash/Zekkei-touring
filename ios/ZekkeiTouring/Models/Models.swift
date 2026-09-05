@@ -102,8 +102,21 @@ struct ZekkeiRoad: Codable, Identifiable, Hashable {
     var avgParking: Double?
     var mediaCount: Int?
     var coverPath: String?
+    /// user / seed_manual / seed_auto
+    var source: String?
+    /// gps / routed / approx
+    var geometryQuality: String?
 
     var coordinates: [CLLocationCoordinate2D] { geojson.points }
+    /// 動画から自動抽出された道か（ユーザーの実走ではない）
+    var isFromVideos: Bool { source == "seed_auto" || (isSeed && youtubeUrl != nil) }
+    var geometryNote: String? {
+        switch geometryQuality {
+        case "routed": return "位置は地図経路による推定です。実走の投稿で補正されます"
+        case "approx": return "位置は概略です。実走の投稿で補正されます"
+        default: return nil
+        }
+    }
     var lengthKmText: String { String(format: "%.1f km", lengthM / 1000) }
 
     /// 総合スコア（絶景度を重視した加重平均）
@@ -134,6 +147,8 @@ struct ZekkeiRoad: Codable, Identifiable, Hashable {
         case avgParking = "avg_parking"
         case mediaCount = "media_count"
         case coverPath = "cover_path"
+        case source
+        case geometryQuality = "geometry_quality"
     }
 }
 
@@ -158,6 +173,39 @@ struct RoadDraft: Codable {
         case geom
         case lengthM = "length_m"
         case curviness
+    }
+}
+
+// MARK: - 道に紐づく動画
+
+struct RoadVideo: Codable, Identifiable, Hashable {
+    var id: Int64
+    var roadId: UUID
+    var videoId: String
+    var url: String
+    var title: String?
+    var channel: String?
+    var viewCount: Int?
+    var timestampLabel: String?
+
+    /// YouTube の公式サムネイル
+    var thumbnailURL: URL? { URL(string: "https://i.ytimg.com/vi/\(videoId)/mqdefault.jpg") }
+    /// 登場時刻付きの再生 URL（例: 15:14 → t=914）
+    var playURL: URL? {
+        guard let ts = timestampLabel, !ts.isEmpty else { return URL(string: url) }
+        let parts = ts.split(separator: ":").compactMap { Int($0) }
+        var seconds = 0
+        for p in parts { seconds = seconds * 60 + p }
+        return URL(string: "https://www.youtube.com/watch?v=\(videoId)&t=\(seconds)s")
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case roadId = "road_id"
+        case videoId = "video_id"
+        case url, title, channel
+        case viewCount = "view_count"
+        case timestampLabel = "timestamp_label"
     }
 }
 
