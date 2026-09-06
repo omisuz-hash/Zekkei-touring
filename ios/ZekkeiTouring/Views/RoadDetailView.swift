@@ -200,8 +200,10 @@ struct RoadDetailView: View {
             if videos.count > 3 {
                 NavigationLink {
                     List(videos) { v in
-                        if let url = v.playURL { Link(destination: url) { VideoRow(video: v) } }
-                            .listRowBackground(Color.clear)
+                        Group {
+                            if let url = v.playURL { Link(destination: url) { VideoRow(video: v) } }
+                        }
+                        .listRowBackground(Color.clear)
                     }
                     .listStyle(.plain).background(ZK.bg).navigationTitle("動画一覧")
                 } label: {
