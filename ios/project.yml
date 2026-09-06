@@ -56,3 +56,7 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
         PRODUCT_BUNDLE_IDENTIFIER: com.zekkeido.app
+        # シミュレータ向けは署名不要にする（チーム未選択でも起動できる）
+        "CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]": "NO"
+        "CODE_SIGNING_REQUIRED[sdk=iphonesimulator*]": "NO"
+        "CODE_SIGN_IDENTITY[sdk=iphonesimulator*]": ""
