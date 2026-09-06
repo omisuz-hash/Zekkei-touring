@@ -271,7 +271,8 @@ extension ZekkeiRoad {
         if let m = n.range(of: #"(県道|都道|府道|道道)\s?(\d{1,4})"#, options: .regularExpression) {
             return "K" + n[m].filter { $0.isNumber }
         }
+        // 通称は区切り文字までを使い、長い場合は 7 文字で切って「…」を付ける
         let base = n.components(separatedBy: CharacterSet(charactersIn: "（(【[〜~・ ")).first ?? n
-        return String(base.prefix(5))
+        return base.count > 7 ? String(base.prefix(6)) + "…" : base
     }
 }

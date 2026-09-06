@@ -12,7 +12,20 @@ struct ExploreMapView: View {
     @State private var isLoading = false
     @State private var lastCenter: CLLocationCoordinate2D?
     @State private var query = ""
+    @State private var spanLat: Double = 1.5
     @FocusState private var searchFocused: Bool
+
+    /// 広域ではタグを絞る（密集を防ぐ）。拡大するほど多く出す
+    private var taggedRoads: [ZekkeiRoad] {
+        let limit: Int
+        switch spanLat {
+        case ..<0.25: limit = 200
+        case ..<0.6: limit = 40
+        case ..<1.2: limit = 15
+        default: limit = 6
+        }
+        return Array(roads.sorted { ($0.ratingCount, $0.avgScenery ?? 0) > ($1.ratingCount, $1.avgScenery ?? 0) }.prefix(limit))
+    }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -29,6 +42,8 @@ struct ExploreMapView: View {
                     if (road.avgScenery ?? 0) >= 4.5 && road.ratingCount > 0 {
                         MapPolyline(coordinates: road.coordinates).stroke(Color.white.opacity(0.7), lineWidth: 1.2)
                     }
+                }
+                ForEach(taggedRoads) { road in
                     if let start = road.coordinates.first {
                         Annotation(road.name, coordinate: start, anchor: .bottomLeading) {
                             CodeTag(code: road.shortCode, fromVideo: road.isFromVideos, muted: road.ratingCount == 0)
@@ -42,6 +57,7 @@ struct ExploreMapView: View {
             .mapStyle(.hybrid(elevation: .realistic))
             .mapControls { MapCompass() }
             .onMapCameraChange(frequency: .onEnd) { ctx in
+                spanLat = ctx.region.span.latitudeDelta
                 Task { await load(center: ctx.region.center, span: ctx.region.span) }
             }
             .ignoresSafeArea()
