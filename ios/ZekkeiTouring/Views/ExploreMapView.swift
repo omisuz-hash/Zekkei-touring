@@ -8,6 +8,9 @@ struct ExploreMapView: View {
         MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 36.2, longitude: 138.5),
                            span: MKCoordinateSpan(latitudeDelta: 1.5, longitudeDelta: 1.5)))
     @State private var roads: [ZekkeiRoad] = []
+    /// 地図側の選択（ホバーや再読込で変わりうる）
+    @State private var mapSelection: ZekkeiRoad?
+    /// 詳細シートに出す道。開いている間は地図側の選択が変わっても保持する
     @State private var selected: ZekkeiRoad?
     @State private var isLoading = false
     @State private var lastCenter: CLLocationCoordinate2D?
@@ -22,7 +25,7 @@ struct ExploreMapView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            Map(position: $position, selection: $selected) {
+            Map(position: $position, selection: $mapSelection) {
                 UserAnnotation()
                 ForEach(taggedRoads) { road in
                     let color = ZK.color(for: road)
@@ -93,7 +96,10 @@ struct ExploreMapView: View {
                 ProgressView().tint(.white).padding(8).glassPill(radius: 999).padding(.top, 60)
             }
         }
-        .sheet(item: $selected) { road in
+        .onChange(of: mapSelection) { _, new in
+            if let r = new, selected == nil { selected = r }
+        }
+        .sheet(item: $selected, onDismiss: { mapSelection = nil }) { road in
             RoadDetailView(road: road)
                 .presentationDetents([.fraction(0.62), .large])
                 .presentationBackground(Color(hex: 0x14181C).opacity(0.96))

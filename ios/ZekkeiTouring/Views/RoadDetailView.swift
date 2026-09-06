@@ -98,9 +98,17 @@ struct RoadDetailView: View {
             }
             .mapStyle(.hybrid(elevation: .flat))
             .mapControlVisibility(.hidden)
+            .allowsHitTesting(false)
             .frame(height: heroImageURL == nil ? 220 : 160)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(ZK.border, lineWidth: 1))
+            .overlay(alignment: .bottomTrailing) {
+                Label("Google マップで経路を開く", systemImage: "arrow.up.right.square")
+                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
+                    .padding(.horizontal, 10).padding(.vertical, 6).glassPill(radius: 999).padding(8)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { openNavigation() }
         }
     }
 
@@ -286,14 +294,10 @@ struct RoadDetailView: View {
         reportReason = ""
     }
 
+    /// Google マップに「この道に沿った経路」を渡す。Google マップのアプリが入っていれば自動でそちらが開き、そのままナビに使える
     private func openNavigation() {
-        guard let s = road.coordinates.first, let e = road.coordinates.last else { return }
-        let origin = "\(s.latitude),\(s.longitude)", dest = "\(e.latitude),\(e.longitude)"
-        if let url = URL(string: "comgooglemaps://?saddr=\(origin)&daddr=\(dest)&directionsmode=driving"), UIApplication.shared.canOpenURL(url) {
-            UIApplication.shared.open(url)
-        } else if let web = URL(string: "https://www.google.com/maps/dir/?api=1&origin=\(origin)&destination=\(dest)&travelmode=driving") {
-            UIApplication.shared.open(web)
-        }
+        guard let url = road.googleMapsRouteURL else { return }
+        UIApplication.shared.open(url)
     }
 }
 

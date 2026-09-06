@@ -131,6 +131,29 @@ struct ZekkeiRoad: Codable, Identifiable, Hashable {
     }
 
     var coordinates: [CLLocationCoordinate2D] { geojson.points }
+
+    /// Google マップで「この道に沿った経路」を表示する URL。始点・終点に加え、道に沿った経由地を最大 8 つ渡す
+    var googleMapsRouteURL: URL? {
+        let pts = coordinates
+        guard let s = pts.first, let e = pts.last, pts.count >= 2 else { return nil }
+        let f = { (c: CLLocationCoordinate2D) in String(format: "%.5f,%.5f", c.latitude, c.longitude) }
+        var waypoints: [String] = []
+        let n = min(8, max(0, pts.count - 2))
+        if n > 0 {
+            for i in 1...n {
+                let idx = Int(Double(pts.count - 1) * Double(i) / Double(n + 1))
+                waypoints.append(f(pts[idx]))
+            }
+        }
+        var comps = URLComponents(string: "https://www.google.com/maps/dir/")!
+        comps.queryItems = [
+            URLQueryItem(name: "api", value: "1"),
+            URLQueryItem(name: "origin", value: f(s)),
+            URLQueryItem(name: "destination", value: f(e)),
+            URLQueryItem(name: "travelmode", value: "driving"),
+        ] + (waypoints.isEmpty ? [] : [URLQueryItem(name: "waypoints", value: waypoints.joined(separator: "|"))])
+        return comps.url
+    }
     /// 動画から自動抽出された道か（ユーザーの実走ではない）
     var isFromVideos: Bool { source == "seed_auto" || (isSeed && youtubeUrl != nil) }
     var geometryNote: String? {
