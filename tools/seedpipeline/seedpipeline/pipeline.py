@@ -173,6 +173,67 @@ class Pipeline:
             self.geo.calls = 0
         return ok
 
+    # 4b'. スポット取り直し: 取得済みの文章から、立ち寄った店・展望台だけを聞き直す（軽い問い合わせ） ----------
+    def respot(self, limit: int | None = None) -> int:
+        if not self.llm:
+            return 0
+        n = 0
+        self.rate_limited = False
+        for v in self.store.videos_for_respot(limit or self.cfg.max_respot_per_run):
+            roads = self.store.roads_for_video(v["id"])[:5]
+            if not roads:
+                self.store.mark_video_spots_done(v["id"])
+                continue
+            v["chapters"] = json.loads(v["chapters"] or "[]")
+            comments = json.loads(v["comments"] or "[]")
+            try:
+                spots = self.llm.extract_spots(v, comments, [r["name"] for r in roads])
+                self.store.add_quota(gemini_calls=1)
+            except HTTPError as e:
+                if e.status == 429:
+                    log("Gemini の利用枠に達したためスポット取り直しを中断します")
+                    self.rate_limited = True
+                    break
+                log(f"スポット取り直し NG {v['id']}: {e}")
+                self.store.mark_video_spots_done(v["id"])
+                continue
+            # どの道の途中かは、後の「スポット」段階で道からの距離（3 km 以内）で決まる。ここでは動画の道すべてに候補として付ける
+            for r in roads:
+                self.store.add_video_spots(r["id"], spots, v["id"])
+            self.store.mark_video_spots_done(v["id"])
+            n += len(spots)
+            if spots:
+                log(f"スポット候補 {v['title'][:30]} → " + "、".join(s['name'] for s in spots[:6]))
+        return n
+
+    def retry_respot(self) -> int:
+        return self.store.reset_respot()
+
+    # 4c'. 沿線の名所: Wikipedia の座標付き記事（峠・湖・滝・展望台・道の駅・神社仏閣）を道の近くから集める ----------
+    def wiki(self, limit: int | None = None) -> int:
+        from .wiki import spots_along
+        n = 0
+        for r in self.store.roads_pending_wiki(limit or self.cfg.max_wiki_per_run):
+            try:
+                sps = spots_along(r)
+            except HTTPError as e:
+                if e.status == 429:
+                    log("Wikipedia の呼び出し制限に達したため沿線の名所を中断します（次回に続きから再開）")
+                    break
+                log(f"沿線 NG: {r['name']} ({e})")
+                sps = []
+            except Exception as e:
+                log(f"沿線 NG: {r['name']} ({e})")
+                sps = []
+            added = self.store.add_wiki_spots(r["id"], sps)
+            n += added
+            if sps:
+                log(f"沿線 {r['name']}: " + "、".join(f"{s['name']}({s['kind']}{'・写真' if s.get('photo_url') else ''})" for s in sps))
+        return n
+
+    def retry_wiki(self) -> int:
+        return self.store.reset_wiki()
+
     # 4c. スポット: 展望台・飲食店・道の駅などを道の近くに位置付ける ----------
     def spots(self, limit: int | None = None) -> int:
         from .spots import build_spots
@@ -327,7 +388,9 @@ class Pipeline:
             if remaining == 0 or (fetched == 0 and extracted == 0 and geo == 0):
                 break
         self._stage("統合", self.dedupe)
+        self._stage("スポット取り直し", self.respot)
         self._stage("スポット", self.spots)
+        self._stage("沿線の名所", self.wiki)
         self._stage("写真", self.photos)
         log("== 集計 ==")
         for k, v in sorted(self.store.stats().items()):

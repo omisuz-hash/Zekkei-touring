@@ -155,6 +155,10 @@ def main():
     sub.add_parser("dedupe", help="重複統合")
     sp = sub.add_parser("spots", help="展望台・飲食店・道の駅などを道の近くに位置付ける"); sp.add_argument("--limit", type=int)
     sub.add_parser("retry-spots", help="全ての道のスポットを位置付けし直す")
+    rs = sub.add_parser("respot", help="取得済みの動画の文章から立ち寄りスポットを取り直す（Gemini・軽い問い合わせ）"); rs.add_argument("--limit", type=int)
+    sub.add_parser("retry-respot", help="全ての動画をスポット取り直しの対象に戻す")
+    wk = sub.add_parser("wiki", help="Wikipedia の沿線記事から名所スポットを集める"); wk.add_argument("--limit", type=int)
+    sub.add_parser("retry-wiki", help="全ての道を沿線の名所の対象に戻す")
     ph = sub.add_parser("photos", help="スポットの代表写真を Wikimedia Commons から取る"); ph.add_argument("--limit", type=int)
     sub.add_parser("retry-photos", help="写真が無いスポットをもう一度探す")
     pt = sub.add_parser("photo-test", help="1 地点で写真探索を試す（例: photo-test 宮ヶ瀬湖 35.5236 139.2461）")
@@ -206,6 +210,14 @@ def main():
             print("Wikipedia NG:", repr(e))
     elif args.cmd == "retry-photos":
         print(f"{p.retry_photos()} 件のスポットを対象に戻しました")
+    elif args.cmd == "respot":
+        print(f"スポット候補 {p.respot(args.limit)} 件")
+    elif args.cmd == "retry-respot":
+        print(f"{p.retry_respot()} 本の動画を対象に戻しました")
+    elif args.cmd == "wiki":
+        print(f"沿線の名所 {p.wiki(args.limit)} 件")
+    elif args.cmd == "retry-wiki":
+        print(f"{p.retry_wiki()} 本の道を対象に戻しました")
     elif args.cmd == "retry-spots":
         print(f"{p.retry_spots()} 本の道を対象に戻しました")
     elif args.cmd == "export":

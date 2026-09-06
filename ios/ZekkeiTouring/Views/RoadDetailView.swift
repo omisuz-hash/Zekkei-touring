@@ -133,11 +133,11 @@ struct RoadDetailView: View {
     /// スポットのピン。動画由来は明るく、Apple の地図データ由来は控えめに
     private func spotPin(_ sp: RoadSpot) -> some View {
         Image(systemName: sp.icon).font(.system(size: 9, weight: .bold))
-            .foregroundStyle(sp.isFromVideo ? ZK.primaryButtonText : .white)
+            .foregroundStyle(sp.isCurated ? ZK.primaryButtonText : .white)
             .frame(width: 20, height: 20)
-            .background(sp.isFromVideo ? ZK.accent : Color.black.opacity(0.55))
+            .background(sp.isCurated ? ZK.accent : Color.black.opacity(0.55))
             .clipShape(Circle())
-            .overlay(Circle().stroke(sp.isFromVideo ? .white.opacity(0.9) : .white.opacity(0.4), lineWidth: 1))
+            .overlay(Circle().stroke(sp.isCurated ? .white.opacity(0.9) : .white.opacity(0.4), lineWidth: 1))
     }
 
     /// 立ち寄りスポット: タップで Google マップにその場所を表示
@@ -146,8 +146,8 @@ struct RoadDetailView: View {
             HStack {
                 CaptionLabel(text: "立ち寄りスポット")
                 Spacer()
-                if spots.contains(where: { $0.isFromVideo }) {
-                    Text("● 動画で紹介").font(.system(size: 9, weight: .semibold)).foregroundStyle(ZK.accent)
+                if spots.contains(where: { $0.isCurated }) {
+                    Text(spots.contains(where: { $0.isFromVideo }) ? "● 動画で紹介・名所" : "● 沿線の名所").font(.system(size: 9, weight: .semibold)).foregroundStyle(ZK.accent)
                 }
             }
             ScrollView(.horizontal, showsIndicators: false) {
@@ -174,24 +174,24 @@ struct RoadDetailView: View {
                     spotPlaceholder(sp)
                 }
                 Image(systemName: sp.icon).font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(sp.isFromVideo ? ZK.primaryButtonText : .white)
+                    .foregroundStyle(sp.isCurated ? ZK.primaryButtonText : .white)
                     .frame(width: 18, height: 18)
-                    .background(sp.isFromVideo ? ZK.accent : Color.black.opacity(0.55)).clipShape(Circle())
+                    .background(sp.isCurated ? ZK.accent : Color.black.opacity(0.55)).clipShape(Circle())
                     .padding(6)
             }
             .frame(width: 150, height: 84).clipped()
             VStack(alignment: .leading, spacing: 2) {
                 Text(sp.name).font(.system(size: 12, weight: .bold)).foregroundStyle(.white).lineLimit(1)
                 Text(sp.note?.isEmpty == false ? sp.note! : sp.kindLabel).font(.system(size: 9)).foregroundStyle(ZK.caption).lineLimit(1)
-                if let credit = sp.photoCredit, sp.photoSource == "commons" {
+                if let credit = sp.photoCredit, sp.photoSource == "commons" || sp.photoSource == "wikipedia" {
                     Text(credit).font(.system(size: 7)).foregroundStyle(ZK.disabled).lineLimit(1)
                 }
             }
             .padding(.horizontal, 8).padding(.vertical, 6).frame(width: 150, alignment: .leading)
         }
-        .background(sp.isFromVideo ? ZK.tagBg : Color.white.opacity(0.04))
+        .background(sp.isCurated ? ZK.tagBg : Color.white.opacity(0.04))
         .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(sp.isFromVideo ? ZK.accent.opacity(0.6) : ZK.chipBorder, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(sp.isCurated ? ZK.accent.opacity(0.6) : ZK.chipBorder, lineWidth: 1))
     }
 
     private func spotPlaceholder(_ sp: RoadSpot) -> some View {
@@ -209,9 +209,9 @@ struct RoadDetailView: View {
 
     private var heroImageURL: URL? {
         if let cover = road.coverPath, let u = app.backend.publicURL(bucket: MediaKind.photo.bucket, path: cover) { return u }
-        // スポットに本物の写真（Commons / Wikipedia）があれば、展望台を優先してヒーローに使う
-        let real = spots.filter { $0.photoSource == "commons" || $0.photoSource == "wikipedia" }
-        if let sp = real.first(where: { $0.kind == "viewpoint" }) ?? real.first, let u = sp.photoURL { return u }
+        // スポットに本物の写真が 2 枚以上あるときだけ、展望台を優先してヒーローに使う（1 枚だけならカード側に残す）
+        let real = spots.filter(\.hasRealPhoto)
+        if real.count >= 2, let sp = real.first(where: { $0.kind == "viewpoint" }) ?? real.first, let u = sp.photoURL { return u }
         if let top = videos.first { return URL(string: "https://i.ytimg.com/vi/\(top.videoId)/hqdefault.jpg") }
         return nil
     }

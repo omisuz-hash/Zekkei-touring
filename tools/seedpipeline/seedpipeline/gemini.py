@@ -74,6 +74,28 @@ SYSTEM = """あなたは日本のバイクツーリング動画から「走っ�
 - 分からない項目は空にし、推測で埋めない。"""
 
 
+SPOT_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "spots": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "name": {"type": "STRING", "description": "施設名・地点名（地図検索できる具体名）"},
+                    "kind": {"type": "STRING", "enum": ["viewpoint", "food", "rest", "pass", "onsen", "other"]},
+                    "municipality": {"type": "STRING", "description": "市区町村名。分からなければ空"},
+                    "note": {"type": "STRING", "description": "動画での言及内容を短く（例: 名物の鹿カレー、富士山が正面）"},
+                    "road_name": {"type": "STRING", "description": "どの道の途中か（上の道名から）。分からなければ空"},
+                },
+                "required": ["name", "kind"],
+            },
+        },
+    },
+    "required": ["spots"],
+}
+
+
 class Gemini:
     def __init__(self, api_key: str, model: str = "gemini-3.6-flash"):
         self.key = api_key
@@ -108,6 +130,31 @@ class Gemini:
             return json.loads(text)
         except json.JSONDecodeError:
             return {"is_touring_ride": False, "roads": [], "_raw": text[:500]}
+
+    def extract_spots(self, video: dict, comments: list[dict], road_names: list[str]) -> list[dict]:
+        """取得済みの文章（概要欄・チャプター・コメント）から、立ち寄りスポットだけを取り直す（軽い問い合わせ）"""
+        chapters = "\n".join(f"{c['time']} {c['title']}" for c in video.get("chapters", []))
+        cm = "\n".join(f"- {c['text'][:200]}" for c in comments[:25])
+        text = f"""この動画は次の道を走ったツーリング動画です: {', '.join(road_names)}
+動画の概要欄・チャプター・コメントから、走行中に立ち寄った、または勧めている「具体名のある場所」だけを挙げてください。
+展望台・絶景地点、飲食店（食堂・そば・カフェ・ソフトクリーム等）、道の駅・売店、峠、温泉が対象です。
+地名だけ（市町村名）や道の名前そのものは含めないでください。確信が持てないものは含めないでください。
+
+# 動画
+タイトル: {video['title']}
+チャンネル: {video['channel']}
+
+# 概要欄
+{video.get('description', '')[:4000]}
+
+# チャプター
+{chapters or '（なし）'}
+
+# コメント
+{cm or '（なし）'}
+"""
+        res = self._generate([{"text": text}], SPOT_SCHEMA, temperature=0.1)
+        return [s for s in res.get("spots", []) if isinstance(s, dict) and s.get("name")]
 
     def extract_from_text(self, video: dict, comments: list[dict]) -> dict:
         chapters = "\n".join(f"{c['time']} {c['title']}" for c in video.get("chapters", []))

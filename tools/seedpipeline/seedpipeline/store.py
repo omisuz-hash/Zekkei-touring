@@ -88,14 +88,18 @@ class Store:
         # 既存 DB への列追加（あれば無視）
         cols = {r[1] for r in self.db.execute("pragma table_info(roads)")}
         for col, typ in (("start_municipality", "text"), ("end_municipality", "text"), ("approx_length_km", "real"), ("repair_attempts", "integer default 0"),
-                         ("spots", "text"), ("spots_status", "text default 'pending'")):
+                         ("spots", "text"), ("spots_status", "text default 'pending'"), ("wiki_status", "text default 'pending'")):
             if col not in cols:
                 self.db.execute(f"alter table roads add column {col} {typ}")
         # spots 表も同様（写真の列は後から追加された）
         scols = {r[1] for r in self.db.execute("pragma table_info(spots)")}
-        for col, typ in (("photo_url", "text"), ("photo_credit", "text"), ("photo_source", "text"), ("photo_status", "text default 'pending'")):
+        for col, typ in (("photo_url", "text"), ("photo_credit", "text"), ("photo_source", "text"), ("photo_status", "text default 'pending'"),
+                         ("source", "text default 'seed_auto'"), ("wiki_title", "text")):
             if col not in scols:
                 self.db.execute(f"alter table spots add column {col} {typ}")
+        vcols = {r[1] for r in self.db.execute("pragma table_info(videos)")}
+        if "spots_done" not in vcols:
+            self.db.execute("alter table videos add column spots_done integer default 0")
         self.db.commit()
 
     # --- quota
@@ -225,16 +229,67 @@ class Store:
         if added:
             self.db.execute("update roads set spots=?, spots_status='pending' where id=?", (json.dumps(old, ensure_ascii=False), road_id))
 
-    # --- spots
+    # --- spots（動画の文章からの取り直し）
+    def videos_for_respot(self, limit: int) -> list[dict]:
+        return [dict(r) for r in self.db.execute(
+            """select v.* from videos v where v.status in ('extracted','video_analyzed') and coalesce(v.spots_done,0)=0
+               and exists (select 1 from road_videos rv join roads r on r.id=rv.road_id where rv.video_id=v.id and r.geo_status='ok')
+               order by v.view_count desc limit ?""", (limit,))]
+
+    def roads_for_video(self, video_id: str) -> list[dict]:
+        return [dict(r) for r in self.db.execute(
+            "select r.* from roads r join road_videos rv on rv.road_id=r.id where rv.video_id=? and r.geo_status='ok' order by r.mentions desc", (video_id,))]
+
+    def mark_video_spots_done(self, video_id: str):
+        self.db.execute("update videos set spots_done=1 where id=?", (video_id,))
+        self.db.commit()
+
+    def add_video_spots(self, road_id: int, spots: list[dict], video_id: str):
+        r = self.db.execute("select spots from roads where id=?", (road_id,)).fetchone()
+        old = json.loads((r["spots"] if r else None) or "[]")
+        self._merge_spots(road_id, spots, video_id, old)
+        self.db.commit()
+
+    # --- spots（Wikipedia の沿線記事）
+    def roads_pending_wiki(self, limit: int) -> list[dict]:
+        return [dict(r) for r in self.db.execute(
+            "select * from roads where geo_status='ok' and coalesce(wiki_status,'pending')='pending' order by mentions desc, confidence desc limit ?", (limit,))]
+
+    def add_wiki_spots(self, road_id: int, spots: list[dict]) -> int:
+        n = 0
+        for sp in spots:
+            cur = self.db.execute(
+                """insert or ignore into spots(road_id,name,kind,lng,lat,note,video_id,photo_url,photo_credit,photo_source,photo_status,source,wiki_title)
+                   values (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (road_id, sp["name"], sp["kind"], sp["lng"], sp["lat"], sp.get("note", ""), "",
+                 sp.get("photo_url"), "Wikipedia" if sp.get("photo_url") else None, "wikipedia" if sp.get("photo_url") else None,
+                 "done" if sp.get("photo_url") else "pending", "wikipedia", sp.get("wiki_title")))
+            n += cur.rowcount
+        self.db.execute("update roads set wiki_status='done' where id=?", (road_id,))
+        self.db.commit()
+        return n
+
+    def reset_wiki(self) -> int:
+        cur = self.db.execute("update roads set wiki_status='pending' where geo_status='ok'")
+        self.db.commit()
+        return cur.rowcount
+
+    def reset_respot(self) -> int:
+        cur = self.db.execute("update videos set spots_done=0")
+        self.db.commit()
+        return cur.rowcount
+
     def roads_pending_spots(self, limit: int) -> list[dict]:
         return [dict(r) for r in self.db.execute(
             "select * from roads where geo_status='ok' and coalesce(spots_status,'pending')='pending' order by mentions desc, confidence desc limit ?", (limit,))]
 
     def save_spots(self, road_id: int, spots: list[dict]):
         old = {r["name"]: dict(r) for r in self.db.execute("select * from spots where road_id=?", (road_id,))}
-        self.db.execute("delete from spots where road_id=?", (road_id,))
+        self.db.execute("delete from spots where road_id=? and coalesce(source,'seed_auto')='seed_auto'", (road_id,))
         for sp in spots:
             o = old.get(sp["name"], {})
+            if o and o.get("source") == "wikipedia":
+                continue  # 同名の Wikipedia スポットがあればそちらを残す
             self.db.execute("insert or ignore into spots(road_id,name,kind,lng,lat,note,video_id,photo_url,photo_credit,photo_source,photo_status) values (?,?,?,?,?,?,?,?,?,?,?)",
                             (road_id, sp["name"], sp["kind"], sp["lng"], sp["lat"], sp.get("note", ""), sp.get("video_id", ""),
                              o.get("photo_url"), o.get("photo_credit"), o.get("photo_source"), o.get("photo_status") or "pending"))
@@ -326,7 +381,7 @@ class Store:
 
     def _merge_rest(self, keep_id: int, drop_id: int):
         self.db.execute("insert or ignore into road_videos(road_id,video_id,timestamp,evidence,confidence) select ?,video_id,timestamp,evidence,confidence from road_videos where road_id=?", (keep_id, drop_id))
-        self.db.execute("insert or ignore into spots(road_id,name,kind,lng,lat,note,video_id,photo_url,photo_credit,photo_source,photo_status) select ?,name,kind,lng,lat,note,video_id,photo_url,photo_credit,photo_source,photo_status from spots where road_id=?", (keep_id, drop_id))
+        self.db.execute("insert or ignore into spots(road_id,name,kind,lng,lat,note,video_id,photo_url,photo_credit,photo_source,photo_status,source,wiki_title) select ?,name,kind,lng,lat,note,video_id,photo_url,photo_credit,photo_source,photo_status,source,wiki_title from spots where road_id=?", (keep_id, drop_id))
         self.db.execute("delete from spots where road_id=?", (drop_id,))
         self.db.execute("delete from road_videos where road_id=?", (drop_id,))
         self.db.execute("update roads set mentions=(select count(*) from road_videos where road_id=?) where id=?", (keep_id, keep_id))
@@ -349,6 +404,11 @@ class Store:
             s[f"roads_{r['geo_status']}"] = r["c"]
         s["roads_total"] = self.db.execute("select count(*) from roads").fetchone()[0]
         s["spots_total"] = self.db.execute("select count(*) from spots").fetchone()[0]
+        s["spots_wikipedia"] = self.db.execute("select count(*) from spots where source='wikipedia'").fetchone()[0]
+        s["roads_with_spots"] = self.db.execute("select count(distinct road_id) from spots").fetchone()[0]
+        s["videos_respot_pending"] = self.db.execute(
+            "select count(*) from videos where status in ('extracted','video_analyzed') and coalesce(spots_done,0)=0").fetchone()[0]
+        s["roads_wiki_pending"] = self.db.execute("select count(*) from roads where geo_status='ok' and coalesce(wiki_status,'pending')='pending'").fetchone()[0]
         s["spots_with_photo"] = self.db.execute("select count(*) from spots where photo_url is not null").fetchone()[0]
         s["spots_photo_pending"] = self.db.execute("select count(*) from spots where coalesce(photo_status,'pending')='pending'").fetchone()[0]
         s["roads_spots_pending"] = self.db.execute("select count(*) from roads where geo_status='ok' and coalesce(spots_status,'pending')='pending'").fetchone()[0]

@@ -247,6 +247,11 @@ struct RoadSpot: Codable, Identifiable, Hashable {
 
     var coordinate: CLLocationCoordinate2D { CLLocationCoordinate2D(latitude: lat, longitude: lng) }
     var photoURL: URL? { photoUrl.flatMap(URL.init(string:)) }
+    /// 編集部データ（動画由来 / Wikipedia の名所）。Apple の地図データによる補完は含まない
+    var isCurated: Bool { source == "seed_auto" || source == "wikipedia" }
+    var isFromWikipedia: Bool { source == "wikipedia" }
+    /// 本物の写真（動画サムネイルではない）
+    var hasRealPhoto: Bool { photoUrl != nil && (photoSource == "commons" || photoSource == "wikipedia") }
 
     enum CodingKeys: String, CodingKey {
         case id, name, kind, lat, lng, note, source

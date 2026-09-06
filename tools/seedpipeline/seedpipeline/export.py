@@ -55,13 +55,14 @@ def export_sql(store, path: str, min_confidence: float = 0.5, min_mentions: int 
             def nq(v):
                 return q(v) if v else "null"
             lines.append("insert into public.road_spots (road_id, name, kind, lat, lng, note, source, video_id, photo_url, photo_credit, photo_source)")
-            lines.append(f"select z.id, s.name, s.kind, s.lat, s.lng, s.note, 'seed_auto', s.video_id, s.photo_url, s.photo_credit, s.photo_source from public.zekkei_roads z, (values")
-            lines.append(",\n".join(f"  ({q(s['name'])}, {q(s['kind'])}, {float(s['lat']):.6f}, {float(s['lng']):.6f}, {q(s['note'] or '')}, {q(s['video_id'] or '')}, "
+            lines.append(f"select z.id, s.name, s.kind, s.lat, s.lng, s.note, s.source, s.video_id, s.photo_url, s.photo_credit, s.photo_source from public.zekkei_roads z, (values")
+            lines.append(",\n".join(f"  ({q(s['name'])}, {q(s['kind'])}, {float(s['lat']):.6f}, {float(s['lng']):.6f}, {q(s['note'] or '')}, {q(s.get('source') or 'seed_auto')}, {q(s['video_id'] or '')}, "
                                     f"{nq(s.get('photo_url'))}, {nq(s.get('photo_credit'))}, {nq(s.get('photo_source'))})" for s in spots))
-            lines.append(f") as s(name, kind, lat, lng, note, video_id, photo_url, photo_credit, photo_source) where z.seed_key = {q(r['key'])}")
-            lines.append("on conflict (road_id, name) do update set note = excluded.note, photo_url = coalesce(excluded.photo_url, road_spots.photo_url), "
+            lines.append(f") as s(name, kind, lat, lng, note, source, video_id, photo_url, photo_credit, photo_source) where z.seed_key = {q(r['key'])}")
+            lines.append("on conflict (road_id, name) do update set note = excluded.note, kind = excluded.kind, source = excluded.source, "
+                         "photo_url = coalesce(excluded.photo_url, road_spots.photo_url), "
                          "photo_credit = coalesce(excluded.photo_credit, road_spots.photo_credit), photo_source = coalesce(excluded.photo_source, road_spots.photo_source) "
-                         "where road_spots.source = 'seed_auto';")
+                         "where road_spots.source in ('seed_auto', 'wikipedia');")
         lines.append("")
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))

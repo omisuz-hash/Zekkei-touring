@@ -29,6 +29,8 @@ class Config:
     max_geo_per_run: int = field(default_factory=lambda: int(_env("SEED_MAX_GEO", "600")))
     max_spots_per_run: int = field(default_factory=lambda: int(_env("SEED_MAX_SPOTS", "300")))
     max_photos_per_run: int = field(default_factory=lambda: int(_env("SEED_MAX_PHOTOS", "400")))
+    max_respot_per_run: int = field(default_factory=lambda: int(_env("SEED_MAX_RESPOT", "400")))
+    max_wiki_per_run: int = field(default_factory=lambda: int(_env("SEED_MAX_WIKI", "300")))
     # 当たりチャンネルの投稿一覧を 1 回の実行でたどる数
     channels_per_run: int = field(default_factory=lambda: int(_env("SEED_CHANNELS_PER_RUN", "5")))
     # 動画の長さ（秒）。短すぎる（Shorts）と長すぎる（生配信）は除外
