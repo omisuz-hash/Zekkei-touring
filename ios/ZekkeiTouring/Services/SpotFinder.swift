@@ -27,7 +27,7 @@ enum SpotFinder {
                 let d = coords.map { GeoUtils.distance($0, c) }.min() ?? .infinity
                 guard d <= maxDistanceM else { continue }
                 names.insert(normalize(name))
-                out.append(RoadSpot(id: UUID(), roadId: road.id, name: name, kind: kind, lat: c.latitude, lng: c.longitude, note: nil, source: "apple", videoId: nil))
+                out.append(RoadSpot(id: UUID(), roadId: road.id, name: name, kind: kind, lat: c.latitude, lng: c.longitude, note: nil, source: "apple", videoId: nil, photoUrl: nil, photoCredit: nil, photoSource: nil))
                 if out.count >= limit { return out }
             }
         }

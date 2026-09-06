@@ -31,8 +31,9 @@ enum ZK {
     static let primaryButton = Color(hex: 0xE9F6FC)
     static let primaryButtonText = Color(hex: 0x0B1A23)
     // 絶景度 3 段階
-    static let tier1 = Color(hex: 0x8ED4F5)       // 4.5 以上
-    static let tier2 = Color(hex: 0x1B9BD6)       // 3.5 以上
+    static let tier1 = Color(hex: 0x1B9BD6)       // 4.5 以上（濃いブルー）
+    static let tier2 = Color(hex: 0x8ED4F5)       // 3.5 以上（薄いブルー）
+    static let highlight = Color(hex: 0x8ED4F5)   // 強調（数字・ピン・記録中の軌跡）
     static let tier3 = Color(hex: 0x7C8B95)       // 評価が少ない
     // 文字
     static let text = Color.white
@@ -151,17 +152,17 @@ struct CodeTag: View {
     var body: some View {
         let size: CGFloat = level >= 2 ? 13 : (level == 1 ? 10.5 : 9)
         let weight: Font.Weight = level >= 2 ? .heavy : (level == 1 ? .bold : .medium)
-        let border = muted ? ZK.tier3 : (level >= 2 ? ZK.tier1 : ZK.accent)
+        let border = muted ? ZK.tier3 : (level >= 2 ? ZK.highlight : ZK.accent)
         HStack(spacing: 4) {
             Image(systemName: fromVideo ? "play.fill" : "star.fill").font(.system(size: size * 0.75, weight: .bold))
             Text(code).font(.system(size: size, weight: weight)).tracking(0.4)
         }
-        .foregroundStyle(muted ? ZK.caption : (level >= 2 ? ZK.tier1 : .white))
+        .foregroundStyle(muted ? ZK.caption : (level >= 2 ? ZK.highlight : .white))
         .padding(.horizontal, level >= 2 ? 10 : 8).padding(.vertical, level >= 2 ? 6 : 5)
         .background(muted ? Color(hex: 0x1A2126).opacity(0.85) : ZK.tagBg.opacity(level == 0 ? 0.8 : 1))
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(border, lineWidth: level >= 2 ? 1.6 : 1.2))
-        .shadow(color: level >= 2 ? ZK.tier1.opacity(0.45) : .clear, radius: 6)
+        .shadow(color: level >= 2 ? ZK.highlight.opacity(0.45) : .clear, radius: 6)
     }
 }
 
@@ -268,7 +269,7 @@ struct StarPicker: View {
             ForEach(1...5, id: \.self) { i in
                 Image(systemName: "star.fill")
                     .font(.system(size: 24))
-                    .foregroundStyle(i <= value ? ZK.tier1 : Color.white.opacity(0.14))
+                    .foregroundStyle(i <= value ? ZK.highlight : Color.white.opacity(0.14))
                     .frame(width: 34, height: 44)
                     .contentShape(Rectangle())
                     .onTapGesture { value = i }

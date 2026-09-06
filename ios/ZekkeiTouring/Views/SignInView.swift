@@ -23,7 +23,7 @@ struct SignInView: View {
                     ZStack {
                         RoundedRectangle(cornerRadius: 14, style: .continuous).fill(ZK.primaryButtonText)
                         RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(ZK.accent, lineWidth: 1.2)
-                        Image(systemName: "point.topleft.down.to.point.bottomright.curvepath").font(.system(size: 24, weight: .bold)).foregroundStyle(ZK.tier1)
+                        Image(systemName: "point.topleft.down.to.point.bottomright.curvepath").font(.system(size: 24, weight: .bold)).foregroundStyle(ZK.highlight)
                     }
                     .frame(width: 56, height: 56)
                     VStack(alignment: .leading, spacing: 2) {
@@ -151,8 +151,8 @@ struct GlowRoad: View {
             p.addCurve(to: CGPoint(x: size.width + 20, y: size.height * 0.15),
                        control1: CGPoint(x: size.width * 0.75, y: size.height * 0.36),
                        control2: CGPoint(x: size.width * 0.9, y: size.height * 0.2))
-            ctx.stroke(p, with: .color(ZK.tier1.opacity(0.35)), style: StrokeStyle(lineWidth: 18, lineCap: .round))
-            ctx.stroke(p, with: .color(ZK.tier1), style: StrokeStyle(lineWidth: 5, lineCap: .round))
+            ctx.stroke(p, with: .color(ZK.highlight.opacity(0.35)), style: StrokeStyle(lineWidth: 18, lineCap: .round))
+            ctx.stroke(p, with: .color(ZK.highlight), style: StrokeStyle(lineWidth: 5, lineCap: .round))
         }
     }
 }

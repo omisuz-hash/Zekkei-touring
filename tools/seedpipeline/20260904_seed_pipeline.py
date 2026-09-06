@@ -155,6 +155,8 @@ def main():
     sub.add_parser("dedupe", help="重複統合")
     sp = sub.add_parser("spots", help="展望台・飲食店・道の駅などを道の近くに位置付ける"); sp.add_argument("--limit", type=int)
     sub.add_parser("retry-spots", help="全ての道のスポットを位置付けし直す")
+    ph = sub.add_parser("photos", help="スポットの代表写真を Wikimedia Commons から取る"); ph.add_argument("--limit", type=int)
+    sub.add_parser("retry-photos", help="写真が無いスポットをもう一度探す")
     x = sub.add_parser("export", help="SQL / GeoJSON / レポートを出力"); x.add_argument("--out", default="out"); x.add_argument("--min-confidence", type=float, default=0.5); x.add_argument("--min-scenery", type=float, default=2.5)
     sub.add_parser("stats")
     i = sub.add_parser("import-json", help="tools/youtube の取得結果を取り込む"); i.add_argument("path")
@@ -188,6 +190,10 @@ def main():
         log(f"統合 {p.dedupe()} 組")
     elif args.cmd == "spots":
         print(f"スポット {p.spots(args.limit)} 件")
+    elif args.cmd == "photos":
+        print(f"写真 {p.photos(args.limit)} 件")
+    elif args.cmd == "retry-photos":
+        print(f"{p.retry_photos()} 件のスポットを対象に戻しました")
     elif args.cmd == "retry-spots":
         print(f"{p.retry_spots()} 本の道を対象に戻しました")
     elif args.cmd == "export":

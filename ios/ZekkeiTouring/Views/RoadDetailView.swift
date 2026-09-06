@@ -27,7 +27,7 @@ struct RoadDetailView: View {
                     if !spots.isEmpty { spotSection }
                     HStack(spacing: 8) {
                         StatTile(caption: "スコア", value: road.overallScore.map { String(format: "%.1f", $0) } ?? "–",
-                                 note: road.ratingCount > 0 ? "\(road.ratingCount) 件" : (road.isProvisional ? "動画から推定" : "評価待ち"), valueColor: ZK.tier1)
+                                 note: road.ratingCount > 0 ? "\(road.ratingCount) 件" : (road.isProvisional ? "動画から推定" : "評価待ち"), valueColor: ZK.highlight)
                         StatTile(caption: "絶景度", value: road.displayScenery.map { String(format: "%.1f", $0) } ?? "–",
                                  note: road.ratingCount > 0 ? (road.avgScenery.map { $0 >= 4.5 ? "最高評価" : "5 点満点" } ?? "") : (road.isProvisional ? "動画から推定" : "評価待ち"))
                         StatTile(caption: "動画", value: "\(videos.count)", note: "YouTube")
@@ -150,29 +150,55 @@ struct RoadDetailView: View {
                     ForEach(spots) { sp in
                         Button {
                             if let u = sp.googleMapsURL { UIApplication.shared.open(u) }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: sp.icon).font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(sp.isFromVideo ? ZK.accent : ZK.caption)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(sp.name).font(.system(size: 12, weight: .bold)).foregroundStyle(.white).lineLimit(1)
-                                    Text(sp.note?.isEmpty == false ? sp.note! : sp.kindLabel).font(.system(size: 9)).foregroundStyle(ZK.caption).lineLimit(1)
-                                }
-                            }
-                            .padding(.horizontal, 10).frame(height: 40)
-                            .background(sp.isFromVideo ? ZK.tagBg : .clear)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(sp.isFromVideo ? ZK.accent.opacity(0.6) : ZK.chipBorder, lineWidth: 1))
-                        }
+                        } label: { spotCard(sp) }
                     }
                 }
             }
         }
     }
 
+    /// スポットのカード: 代表写真（Wikimedia Commons または紹介動画のサムネイル）＋ 名前 ＋ 一言
+    private func spotCard(_ sp: RoadSpot) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack(alignment: .topLeading) {
+                if let url = sp.photoURL {
+                    AsyncImage(url: url) { phase in
+                        if case .success(let img) = phase { img.resizable().scaledToFill() } else { spotPlaceholder(sp) }
+                    }
+                } else {
+                    spotPlaceholder(sp)
+                }
+                Image(systemName: sp.icon).font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(sp.isFromVideo ? ZK.primaryButtonText : .white)
+                    .frame(width: 18, height: 18)
+                    .background(sp.isFromVideo ? ZK.accent : Color.black.opacity(0.55)).clipShape(Circle())
+                    .padding(6)
+            }
+            .frame(width: 150, height: 84).clipped()
+            VStack(alignment: .leading, spacing: 2) {
+                Text(sp.name).font(.system(size: 12, weight: .bold)).foregroundStyle(.white).lineLimit(1)
+                Text(sp.note?.isEmpty == false ? sp.note! : sp.kindLabel).font(.system(size: 9)).foregroundStyle(ZK.caption).lineLimit(1)
+                if let credit = sp.photoCredit, sp.photoSource == "commons" {
+                    Text(credit).font(.system(size: 7)).foregroundStyle(ZK.disabled).lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 8).padding(.vertical, 6).frame(width: 150, alignment: .leading)
+        }
+        .background(sp.isFromVideo ? ZK.tagBg : Color.white.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(sp.isFromVideo ? ZK.accent.opacity(0.6) : ZK.chipBorder, lineWidth: 1))
+    }
+
+    private func spotPlaceholder(_ sp: RoadSpot) -> some View {
+        ZStack {
+            LinearGradient(colors: [Color(hex: 0x1B2A33), Color(hex: 0x0F1A21)], startPoint: .top, endPoint: .bottom)
+            Image(systemName: sp.icon).font(.system(size: 22)).foregroundStyle(ZK.caption.opacity(0.6))
+        }
+    }
+
     private func pin(_ t: String) -> some View {
         Text(t).font(.system(size: 9, weight: .heavy)).foregroundStyle(ZK.primaryButtonText)
-            .frame(width: 18, height: 18).background(ZK.tier1).clipShape(Circle())
+            .frame(width: 18, height: 18).background(ZK.highlight).clipShape(Circle())
             .overlay(Circle().stroke(.black.opacity(0.5), lineWidth: 1))
     }
 

@@ -241,8 +241,12 @@ struct RoadSpot: Codable, Identifiable, Hashable {
     var note: String?
     var source: String?
     var videoId: String?
+    var photoUrl: String?
+    var photoCredit: String?
+    var photoSource: String?
 
     var coordinate: CLLocationCoordinate2D { CLLocationCoordinate2D(latitude: lat, longitude: lng) }
+    var photoURL: URL? { photoUrl.flatMap(URL.init(string:)) }
     var isFromVideo: Bool { source == "seed_auto" }
 
     var kindLabel: String {

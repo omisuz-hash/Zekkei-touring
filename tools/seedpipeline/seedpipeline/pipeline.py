@@ -194,6 +194,29 @@ class Pipeline:
     def retry_spots(self) -> int:
         return self.store.reset_spots()
 
+    # 4d. 写真: スポットの代表写真を Wikimedia Commons から。無ければ紹介動画のサムネイル ----------
+    def photos(self, limit: int | None = None) -> int:
+        from .photos import find_commons_photo
+        n = 0
+        for sp in self.store.spots_pending_photo(limit or self.cfg.max_photos_per_run):
+            url = credit = source = None
+            try:
+                hit = find_commons_photo(sp["lat"], sp["lng"], sp["name"])
+                if hit:
+                    url, credit, source = hit["url"], hit["credit"], "commons"
+            except Exception as e:
+                log(f"写真 NG: {sp['name']} ({e})")
+            if not url and sp.get("video_id"):
+                url, credit, source = f"https://i.ytimg.com/vi/{sp['video_id']}/hqdefault.jpg", "YouTube", "youtube"
+            self.store.save_photo(sp["road_id"], sp["name"], url, credit, source)
+            if url:
+                n += 1
+                log(f"写真 {sp['name']} ← {source}")
+        return n
+
+    def retry_photos(self) -> int:
+        return self.store.reset_photos()
+
     # 4b. 修復: 座標にできなかった道を、Gemini の一般知識で言い直して再試行 ----------
     def repair(self, limit: int = 100) -> int:
         if not self.llm:
@@ -277,6 +300,7 @@ class Pipeline:
                 break
         self._stage("統合", self.dedupe)
         self._stage("スポット", self.spots)
+        self._stage("写真", self.photos)
         log("== 集計 ==")
         for k, v in sorted(self.store.stats().items()):
             log(f"  {k}: {v}")

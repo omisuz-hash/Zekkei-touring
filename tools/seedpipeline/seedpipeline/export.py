@@ -17,7 +17,7 @@ def export_sql(store, path: str, min_confidence: float = 0.5, min_mentions: int 
              and (r["scenery_hint"] is None or r["scenery_hint"] >= min_scenery)]
     lines = [f"-- 自動収集した絶景道シード（{date.today().isoformat()}）。{len(roads)} 本",
              "-- 生成元: tools/seedpipeline。形状は地図 API の経路（geometry_quality = routed）",
-             "-- 前提: 20260903_init.sql, 20260904_media.sql, 20260904_road_videos.sql, 20260906_hints.sql, 20260906_spots.sql 適用済み", ""]
+             "-- 前提: 20260903_init.sql, 20260904_media.sql, 20260904_road_videos.sql, 20260906_hints.sql, 20260906_spots.sql, 20260906_spot_photos.sql 適用済み", ""]
     for r in roads:
         coords = json.loads(r["geom"])
         vids = store.road_videos(r["id"])
@@ -47,11 +47,16 @@ def export_sql(store, path: str, min_confidence: float = 0.5, min_mentions: int 
         lines.append("on conflict (road_id, video_id) do nothing;")
         spots = store.road_spots(r["id"]) if hasattr(store, "road_spots") else []
         if spots:
-            lines.append("insert into public.road_spots (road_id, name, kind, lat, lng, note, source, video_id)")
-            lines.append(f"select z.id, s.name, s.kind, s.lat, s.lng, s.note, 'seed_auto', s.video_id from public.zekkei_roads z, (values")
-            lines.append(",\n".join(f"  ({q(s['name'])}, {q(s['kind'])}, {float(s['lat']):.6f}, {float(s['lng']):.6f}, {q(s['note'] or '')}, {q(s['video_id'] or '')})" for s in spots))
-            lines.append(f") as s(name, kind, lat, lng, note, video_id) where z.seed_key = {q(r['key'])}")
-            lines.append("on conflict (road_id, name) do nothing;")
+            def nq(v):
+                return q(v) if v else "null"
+            lines.append("insert into public.road_spots (road_id, name, kind, lat, lng, note, source, video_id, photo_url, photo_credit, photo_source)")
+            lines.append(f"select z.id, s.name, s.kind, s.lat, s.lng, s.note, 'seed_auto', s.video_id, s.photo_url, s.photo_credit, s.photo_source from public.zekkei_roads z, (values")
+            lines.append(",\n".join(f"  ({q(s['name'])}, {q(s['kind'])}, {float(s['lat']):.6f}, {float(s['lng']):.6f}, {q(s['note'] or '')}, {q(s['video_id'] or '')}, "
+                                    f"{nq(s.get('photo_url'))}, {nq(s.get('photo_credit'))}, {nq(s.get('photo_source'))})" for s in spots))
+            lines.append(f") as s(name, kind, lat, lng, note, video_id, photo_url, photo_credit, photo_source) where z.seed_key = {q(r['key'])}")
+            lines.append("on conflict (road_id, name) do update set note = excluded.note, photo_url = coalesce(excluded.photo_url, road_spots.photo_url), "
+                         "photo_credit = coalesce(excluded.photo_credit, road_spots.photo_credit), photo_source = coalesce(excluded.photo_source, road_spots.photo_source) "
+                         "where road_spots.source = 'seed_auto';")
         lines.append("")
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))

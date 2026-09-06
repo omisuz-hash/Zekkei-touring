@@ -132,8 +132,8 @@ final class MockBackend: Backend {
     func spots(for roadId: UUID) async throws -> [RoadSpot] {
         guard let road = roads.first(where: { $0.id == roadId }), let c = road.coordinates.dropFirst(road.coordinates.count / 2).first else { return [] }
         return [
-            RoadSpot(id: UUID(), roadId: roadId, name: "見晴らし展望台", kind: "viewpoint", lat: c.latitude + 0.004, lng: c.longitude, note: "富士山が正面", source: "seed_auto", videoId: nil),
-            RoadSpot(id: UUID(), roadId: roadId, name: "峠の茶屋", kind: "food", lat: c.latitude - 0.003, lng: c.longitude + 0.004, note: "名物のきのこそば", source: "seed_auto", videoId: nil),
+            RoadSpot(id: UUID(), roadId: roadId, name: "見晴らし展望台", kind: "viewpoint", lat: c.latitude + 0.004, lng: c.longitude, note: "富士山が正面", source: "seed_auto", videoId: nil, photoUrl: "https://i.ytimg.com/vi/0QZ8HaXH3TE/hqdefault.jpg", photoCredit: "YouTube", photoSource: "youtube"),
+            RoadSpot(id: UUID(), roadId: roadId, name: "峠の茶屋", kind: "food", lat: c.latitude - 0.003, lng: c.longitude + 0.004, note: "名物のきのこそば", source: "seed_auto", videoId: nil, photoUrl: nil, photoCredit: nil, photoSource: nil),
         ]
     }
 

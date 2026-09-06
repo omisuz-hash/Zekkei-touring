@@ -24,7 +24,7 @@ struct ProfileView: View {
                             ZStack {
                                 Circle().fill(ZK.tagBg)
                                 Circle().stroke(ZK.accent, lineWidth: 1.2)
-                                Text(String((app.profile?.displayName ?? "？").prefix(1))).font(.system(size: 16, weight: .bold)).foregroundStyle(ZK.tier1)
+                                Text(String((app.profile?.displayName ?? "？").prefix(1))).font(.system(size: 16, weight: .bold)).foregroundStyle(ZK.highlight)
                             }
                             .frame(width: 48, height: 48)
                             VStack(alignment: .leading, spacing: 2) {
@@ -47,9 +47,9 @@ struct ProfileView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 CaptionLabel(text: "残り")
                                 if app.profile?.plan == .subscriber {
-                                    Image(systemName: "infinity").font(.system(size: 34, weight: .bold)).foregroundStyle(ZK.tier1)
+                                    Image(systemName: "infinity").font(.system(size: 34, weight: .bold)).foregroundStyle(ZK.highlight)
                                 } else {
-                                    Text("\(app.creditBalance)").font(.zkNumber(40)).foregroundStyle(ZK.tier1)
+                                    Text("\(app.creditBalance)").font(.zkNumber(40)).foregroundStyle(ZK.highlight)
                                 }
                             }
                             Text("道の詳細を 1 本見るごとに 1 つ使います。絶景道を 1 本投稿すると 3 つ増えます。")
@@ -81,7 +81,7 @@ struct ProfileView: View {
                             HStack {
                                 Text("半径").font(.system(size: 15)).foregroundStyle(.white)
                                 Spacer()
-                                Text("\(Int(app.privacyRadiusMeters).formatted()) m").font(.zkNumber(15)).foregroundStyle(ZK.tier1)
+                                Text("\(Int(app.privacyRadiusMeters).formatted()) m").font(.zkNumber(15)).foregroundStyle(ZK.highlight)
                             }
                             Slider(value: $app.privacyRadiusMeters, in: 300...3000, step: 100).tint(.white)
                             HStack {

@@ -115,16 +115,15 @@ def cmd_migrate():
 
 
 def split_statements(sql: str) -> list[str]:
-    """自動収集シードは 1 本の道ごとに 'do nothing;' で終わる。そこで区切る"""
+    """自動収集シードを 1 文ずつに分ける。文の終わり（; と改行）の直後に次の文（with / insert）が始まる所で区切る"""
     out = []
-    for p in re.split(r"do nothing;\s*\n", sql):
-        # 先頭のコメント行（ファイルの見出し）を落とす
+    for p in re.split(r";\s*\n(?=(?:with r as|insert into|--))", sql):
         lines = [l for l in p.strip().splitlines()]
         while lines and lines[0].startswith("--"):
             lines.pop(0)
-        body = "\n".join(lines).strip()
+        body = "\n".join(lines).strip().rstrip(";")
         if body:
-            out.append(body + "\ndo nothing;")
+            out.append(body + ";")
     return out
 
 

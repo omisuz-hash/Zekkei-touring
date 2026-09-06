@@ -31,8 +31,8 @@ struct TrimView: View {
                     MapPolyline(coordinates: coords).stroke(ZK.caption, lineWidth: 4)
                 }
                 if segment.count > 1 {
-                    MapPolyline(coordinates: segment).stroke(ZK.tier1.opacity(0.35), lineWidth: 16)
-                    MapPolyline(coordinates: segment).stroke(ZK.tier1, lineWidth: 6)
+                    MapPolyline(coordinates: segment).stroke(ZK.highlight.opacity(0.35), lineWidth: 16)
+                    MapPolyline(coordinates: segment).stroke(ZK.highlight, lineWidth: 6)
                 }
                 if let c = app.privacyCenter {
                     MapCircle(center: c, radius: app.privacyRadiusMeters)
@@ -81,7 +81,7 @@ struct TrimView: View {
                 sliderRow("始点", $startIndex, km(cumulative[safe: lower]))
                 sliderRow("終点", $endIndex, km(cumulative[safe: upper]))
                 HStack(spacing: 8) {
-                    StatTile(caption: "選択区間", value: String(format: "%.1f", segmentLengthM / 1000), unit: "km", valueColor: ZK.tier1, valueSize: 24)
+                    StatTile(caption: "選択区間", value: String(format: "%.1f", segmentLengthM / 1000), unit: "km", valueColor: ZK.highlight, valueSize: 24)
                     StatTile(caption: "曲がり具合", value: String(format: "%.0f", GeoUtils.curviness(of: segment) * 100), unit: "%", valueSize: 24)
                 }
             }

@@ -190,12 +190,12 @@ struct DoneView: View {
             ZStack {
                 Circle().fill(ZK.tagBg)
                 Circle().stroke(ZK.accent, lineWidth: 1.2)
-                Image(systemName: "checkmark").font(.system(size: 30, weight: .bold)).foregroundStyle(ZK.tier1)
+                Image(systemName: "checkmark").font(.system(size: 30, weight: .bold)).foregroundStyle(ZK.highlight)
             }
             .frame(width: 72, height: 72)
             Text("投稿しました").font(.system(size: 22, weight: .bold)).foregroundStyle(.white)
             CaptionLabel(text: "閲覧枠の残り")
-            Text("\(balance)").font(.zkNumber(48)).foregroundStyle(ZK.tier1)
+            Text("\(balance)").font(.zkNumber(48)).foregroundStyle(ZK.highlight)
             if let note { Text(note).font(.system(size: 12)).foregroundStyle(ZK.errorText) }
             Button("閉じる") { dismiss() }.buttonStyle(PrimaryButtonStyle()).padding(.horizontal, 24).padding(.top, 8)
         }

@@ -17,8 +17,8 @@ struct RecordView: View {
                 Map(position: $position) {
                     UserAnnotation()
                     if recorder.points.count > 1 {
-                        MapPolyline(coordinates: recorder.points.map(\.coordinate)).stroke(ZK.tier1.opacity(0.35), lineWidth: 12)
-                        MapPolyline(coordinates: recorder.points.map(\.coordinate)).stroke(ZK.tier1, lineWidth: 4)
+                        MapPolyline(coordinates: recorder.points.map(\.coordinate)).stroke(ZK.highlight.opacity(0.35), lineWidth: 12)
+                        MapPolyline(coordinates: recorder.points.map(\.coordinate)).stroke(ZK.highlight, lineWidth: 4)
                     }
                 }
                 .mapStyle(.hybrid(elevation: .realistic))
@@ -84,7 +84,7 @@ struct RecordView: View {
                     Button("設定を開く") {
                         if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
                     }
-                    .font(.system(size: 12, weight: .bold)).foregroundStyle(ZK.tier1)
+                    .font(.system(size: 12, weight: .bold)).foregroundStyle(ZK.highlight)
                 }
                 .padding(12)
                 .background(ZK.tagBg).clipShape(RoundedRectangle(cornerRadius: 12))
@@ -104,7 +104,7 @@ struct RecordView: View {
     private var stateColor: Color {
         switch recorder.state {
         case .idle: return ZK.caption
-        case .recording: return ZK.tier1
+        case .recording: return ZK.highlight
         case .paused: return ZK.paused
         }
     }
@@ -164,7 +164,7 @@ struct RideRow: View {
     let ride: RideLog
     var body: some View {
         HStack(spacing: 12) {
-            TrackSketch(coordinates: ride.coordinates, color: ride.publishedRoadIds.isEmpty ? ZK.tier3 : ZK.tier1)
+            TrackSketch(coordinates: ride.coordinates, color: ride.publishedRoadIds.isEmpty ? ZK.tier3 : ZK.highlight)
                 .frame(width: 56, height: 56)
                 .background(Color(hex: 0x171C1A)).clipShape(RoundedRectangle(cornerRadius: 10))
             VStack(alignment: .leading, spacing: 4) {
@@ -176,7 +176,7 @@ struct RideRow: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
-                Text(ride.publishedRoadIds.isEmpty ? "—" : "✓").font(.system(size: 18, weight: .bold)).foregroundStyle(ride.publishedRoadIds.isEmpty ? ZK.caption : ZK.tier1)
+                Text(ride.publishedRoadIds.isEmpty ? "—" : "✓").font(.system(size: 18, weight: .bold)).foregroundStyle(ride.publishedRoadIds.isEmpty ? ZK.caption : ZK.highlight)
                 Text(ride.publishedRoadIds.isEmpty ? "未投稿" : "投稿 \(ride.publishedRoadIds.count)").font(.system(size: 10)).foregroundStyle(ZK.caption)
             }
         }
@@ -191,7 +191,7 @@ struct RideRow: View {
 /// 軌跡を小さく描く
 struct TrackSketch: View {
     let coordinates: [CLLocationCoordinate2D]
-    var color: Color = ZK.tier1
+    var color: Color = ZK.highlight
     var body: some View {
         Canvas { ctx, size in
             guard coordinates.count > 1 else { return }

@@ -29,6 +29,7 @@ create table if not exists road_videos (
 );
 create table if not exists spots (
   road_id integer, name text, kind text, lng real, lat real, note text, video_id text,
+  photo_url text, photo_credit text, photo_source text, photo_status text default 'pending',
   primary key (road_id, name)
 );
 create table if not exists channels (
@@ -225,12 +226,29 @@ class Store:
             "select * from roads where geo_status='ok' and coalesce(spots_status,'pending')='pending' order by mentions desc, confidence desc limit ?", (limit,))]
 
     def save_spots(self, road_id: int, spots: list[dict]):
+        old = {r["name"]: dict(r) for r in self.db.execute("select * from spots where road_id=?", (road_id,))}
         self.db.execute("delete from spots where road_id=?", (road_id,))
         for sp in spots:
-            self.db.execute("insert or ignore into spots(road_id,name,kind,lng,lat,note,video_id) values (?,?,?,?,?,?,?)",
-                            (road_id, sp["name"], sp["kind"], sp["lng"], sp["lat"], sp.get("note", ""), sp.get("video_id", "")))
+            o = old.get(sp["name"], {})
+            self.db.execute("insert or ignore into spots(road_id,name,kind,lng,lat,note,video_id,photo_url,photo_credit,photo_source,photo_status) values (?,?,?,?,?,?,?,?,?,?,?)",
+                            (road_id, sp["name"], sp["kind"], sp["lng"], sp["lat"], sp.get("note", ""), sp.get("video_id", ""),
+                             o.get("photo_url"), o.get("photo_credit"), o.get("photo_source"), o.get("photo_status") or "pending"))
         self.db.execute("update roads set spots_status='done' where id=?", (road_id,))
         self.db.commit()
+
+    def spots_pending_photo(self, limit: int) -> list[dict]:
+        return [dict(r) for r in self.db.execute(
+            "select s.*, r.name as road_name from spots s join roads r on r.id=s.road_id where coalesce(s.photo_status,'pending')='pending' order by r.mentions desc limit ?", (limit,))]
+
+    def save_photo(self, road_id: int, name: str, url: str | None, credit: str | None, source: str | None):
+        self.db.execute("update spots set photo_url=?, photo_credit=?, photo_source=?, photo_status='done' where road_id=? and name=?",
+                        (url, credit, source, road_id, name))
+        self.db.commit()
+
+    def reset_photos(self) -> int:
+        cur = self.db.execute("update spots set photo_status='pending' where photo_url is null")
+        self.db.commit()
+        return cur.rowcount
 
     def road_spots(self, road_id: int) -> list[dict]:
         return [dict(r) for r in self.db.execute("select * from spots where road_id=? order by kind, name", (road_id,))]
@@ -302,7 +320,7 @@ class Store:
 
     def _merge_rest(self, keep_id: int, drop_id: int):
         self.db.execute("insert or ignore into road_videos(road_id,video_id,timestamp,evidence,confidence) select ?,video_id,timestamp,evidence,confidence from road_videos where road_id=?", (keep_id, drop_id))
-        self.db.execute("insert or ignore into spots(road_id,name,kind,lng,lat,note,video_id) select ?,name,kind,lng,lat,note,video_id from spots where road_id=?", (keep_id, drop_id))
+        self.db.execute("insert or ignore into spots(road_id,name,kind,lng,lat,note,video_id,photo_url,photo_credit,photo_source,photo_status) select ?,name,kind,lng,lat,note,video_id,photo_url,photo_credit,photo_source,photo_status from spots where road_id=?", (keep_id, drop_id))
         self.db.execute("delete from spots where road_id=?", (drop_id,))
         self.db.execute("delete from road_videos where road_id=?", (drop_id,))
         self.db.execute("update roads set mentions=(select count(*) from road_videos where road_id=?) where id=?", (keep_id, keep_id))
@@ -325,6 +343,8 @@ class Store:
             s[f"roads_{r['geo_status']}"] = r["c"]
         s["roads_total"] = self.db.execute("select count(*) from roads").fetchone()[0]
         s["spots_total"] = self.db.execute("select count(*) from spots").fetchone()[0]
+        s["spots_with_photo"] = self.db.execute("select count(*) from spots where photo_url is not null").fetchone()[0]
+        s["spots_photo_pending"] = self.db.execute("select count(*) from spots where coalesce(photo_status,'pending')='pending'").fetchone()[0]
         s["roads_spots_pending"] = self.db.execute("select count(*) from roads where geo_status='ok' and coalesce(spots_status,'pending')='pending'").fetchone()[0]
         s["channels"] = self.db.execute("select count(*) from channels").fetchone()[0]
         return s
