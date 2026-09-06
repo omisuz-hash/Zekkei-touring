@@ -8,6 +8,8 @@ protocol Backend: AnyObject {
     func restoreSession() async
     func signInWithGoogle(idToken: String, accessToken: String?) async throws
     func signInWithApple(idToken: String, nonce: String) async throws
+    /// 開発・検証用: 匿名（ゲスト）ログイン。Supabase 側で Anonymous sign-ins を有効にする
+    func signInAsGuest() async throws
     func signOut() async throws
 
     func profile() async throws -> Profile?
@@ -84,6 +86,7 @@ final class MockBackend: Backend {
     func restoreSession() async {}
     func signInWithGoogle(idToken: String, accessToken: String?) async throws { currentUserId = UUID() }
     func signInWithApple(idToken: String, nonce: String) async throws { currentUserId = UUID() }
+    func signInAsGuest() async throws { currentUserId = UUID() }
     func signOut() async throws { currentUserId = nil }
 
     func profile() async throws -> Profile? {

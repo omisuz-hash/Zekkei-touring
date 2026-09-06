@@ -40,6 +40,10 @@ final class SupabaseBackend: Backend {
             credentials: OpenIDConnectCredentials(provider: .apple, idToken: idToken, nonce: nonce))
     }
 
+    func signInAsGuest() async throws {
+        try await client.auth.signInAnonymously()
+    }
+
     func signOut() async throws {
         try await client.auth.signOut()
     }

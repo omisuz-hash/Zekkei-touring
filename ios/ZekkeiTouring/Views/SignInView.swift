@@ -59,16 +59,21 @@ struct SignInView: View {
                     .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(ZK.chipBorder, lineWidth: 1))
                 }
 
-                if app.isUsingMock {
-                    Button("テスト用: ログインしたことにする") {
-                        Task {
-                            try? await app.backend.signInWithGoogle(idToken: "mock", accessToken: nil)
+                #if DEBUG
+                // 開発ビルドのみ: Apple/Google の設定前でも動作確認できるゲストログイン
+                Button("開発用: ゲストとして試す") {
+                    Task {
+                        do {
+                            try await app.backend.signInAsGuest()
                             await app.refreshAccount()
                             dismiss()
+                        } catch {
+                            app.lastError = "ゲストログインに失敗しました。Supabase の Authentication → Sign In / Providers で「Anonymous sign-ins」を有効にしてください。\n" + error.localizedDescription
                         }
                     }
-                    .font(.system(size: 12)).foregroundStyle(ZK.accent)
                 }
+                .font(.system(size: 12)).foregroundStyle(ZK.accent).frame(maxWidth: .infinity)
+                #endif
                 HStack(spacing: 0) {
                     Text("続けることで ").foregroundStyle(ZK.caption)
                     Link("利用規約", destination: URL(string: "https://example.com/terms")!).foregroundStyle(ZK.accent)
