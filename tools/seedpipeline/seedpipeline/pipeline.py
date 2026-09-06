@@ -232,6 +232,9 @@ class Pipeline:
                     url, credit, source = f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg", "YouTube", "youtube"
             self.store.save_photo(sp["road_id"], sp["name"], url, credit, source)
             tally[source or "none"] = tally.get(source or "none", 0) + 1
+            done = sum(tally.values())
+            if done % 50 == 0:
+                log(f"  … {done} 件（Commons {tally['commons']} / Wikipedia {tally['wikipedia']} / 動画 {tally['youtube']} / エラー {tally['error']}）")
             if url:
                 n += 1
                 log(f"写真 {sp['name']} ← {source}")

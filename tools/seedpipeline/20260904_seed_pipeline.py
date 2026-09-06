@@ -157,6 +157,8 @@ def main():
     sub.add_parser("retry-spots", help="全ての道のスポットを位置付けし直す")
     ph = sub.add_parser("photos", help="スポットの代表写真を Wikimedia Commons から取る"); ph.add_argument("--limit", type=int)
     sub.add_parser("retry-photos", help="写真が無いスポットをもう一度探す")
+    pt = sub.add_parser("photo-test", help="1 地点で写真探索を試す（例: photo-test 宮ヶ瀬湖 35.5236 139.2461）")
+    pt.add_argument("name"); pt.add_argument("lat", type=float); pt.add_argument("lng", type=float)
     x = sub.add_parser("export", help="SQL / GeoJSON / レポートを出力"); x.add_argument("--out", default="out"); x.add_argument("--min-confidence", type=float, default=0.5); x.add_argument("--min-scenery", type=float, default=2.5)
     sub.add_parser("stats")
     i = sub.add_parser("import-json", help="tools/youtube の取得結果を取り込む"); i.add_argument("path")
@@ -192,6 +194,16 @@ def main():
         print(f"スポット {p.spots(args.limit)} 件")
     elif args.cmd == "photos":
         print(f"写真 {p.photos(args.limit)} 件")
+    elif args.cmd == "photo-test":
+        from seedpipeline.photos import find_commons_photo, find_wikipedia_image
+        try:
+            print("Commons:", find_commons_photo(args.lat, args.lng, args.name, radius_m=3000, near_m=1000))
+        except Exception as e:
+            print("Commons NG:", repr(e))
+        try:
+            print("Wikipedia:", find_wikipedia_image(args.name, args.lat, args.lng))
+        except Exception as e:
+            print("Wikipedia NG:", repr(e))
     elif args.cmd == "retry-photos":
         print(f"{p.retry_photos()} 件のスポットを対象に戻しました")
     elif args.cmd == "retry-spots":
