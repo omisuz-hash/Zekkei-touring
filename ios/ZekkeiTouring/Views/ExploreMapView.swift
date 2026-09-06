@@ -102,7 +102,7 @@ struct ExploreMapView: View {
         }
         .sheet(item: $selected) { road in
             RoadDetailView(road: road)
-                .presentationDetents([.medium, .large])
+                .presentationDetents([.fraction(0.62), .large])
                 .presentationBackground(Color(hex: 0x14181C).opacity(0.96))
                 .presentationDragIndicator(.visible)
         }

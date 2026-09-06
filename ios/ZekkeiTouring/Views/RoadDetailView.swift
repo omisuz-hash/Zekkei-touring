@@ -27,13 +27,17 @@ struct RoadDetailView: View {
                         StatTile(caption: "絶景度", value: road.avgScenery.map { String(format: "%.1f", $0) } ?? "–", note: road.avgScenery.map { $0 >= 4.5 ? "最高評価" : "5 点満点" } ?? "評価待ち")
                         StatTile(caption: "動画", value: "\(videos.count)", note: "YouTube")
                     }
+                    // 主操作（閲覧枠を使う / ログイン）は半分の高さでも見える位置に置く
+                    if !unlocked { lockedContent }
                     if let note = road.geometryNote {
                         Text(note).font(.system(size: 10)).foregroundStyle(ZK.caption)
                     }
                     // 動画は閲覧枠の外（無料側）。YouTube の規約上、視聴に条件を付けない
                     if !videos.isEmpty { videoSection }
-
-                    if unlocked { unlockedContent } else { lockedContent }
+                    if unlocked { unlockedContent }
+                    if !unlocked && !videos.isEmpty {
+                        Text("上に引き上げると全体が見えます").font(.system(size: 11)).foregroundStyle(ZK.disabled).frame(maxWidth: .infinity)
+                    }
                 }
                 .padding(.horizontal, 18).padding(.top, 8).padding(.bottom, 24)
             }
