@@ -14,6 +14,8 @@ struct ExploreMapView: View {
     @State private var selected: ZekkeiRoad?
     @State private var isLoading = false
     @State private var lastCenter: CLLocationCoordinate2D?
+    @State private var lastSpanLat: Double = 0
+    @State private var currentRegion: MKCoordinateRegion?
     @State private var query = ""
     @State private var spanLat: Double = 1.5
     @FocusState private var searchFocused: Bool
@@ -54,6 +56,7 @@ struct ExploreMapView: View {
             .mapControls { MapCompass() }
             .onMapCameraChange(frequency: .onEnd) { ctx in
                 spanLat = ctx.region.span.latitudeDelta
+                currentRegion = ctx.region
                 Task { await load(center: ctx.region.center, span: ctx.region.span) }
             }
             .ignoresSafeArea()
@@ -76,12 +79,23 @@ struct ExploreMapView: View {
             }
             .padding(.horizontal, 12).padding(.top, 8)
 
-            // 左下: 凡例 / 右下: 現在地
+            // 左下: 凡例 / 右下: 拡大・縮小・現在地
             VStack {
                 Spacer()
                 HStack(alignment: .bottom) {
                     legend
                     Spacer()
+                    VStack(spacing: 0) {
+                        Button { zoom(by: 0.5) } label: {
+                            Image(systemName: "plus").font(.system(size: 16, weight: .semibold)).foregroundStyle(.white).frame(width: 44, height: 40)
+                        }
+                        Rectangle().fill(ZK.border).frame(width: 24, height: 1)
+                        Button { zoom(by: 2) } label: {
+                            Image(systemName: "minus").font(.system(size: 16, weight: .semibold)).foregroundStyle(.white).frame(width: 44, height: 40)
+                        }
+                    }
+                    .glassPill(radius: 14)
+                    .padding(.trailing, 8)
                     Button {
                         app.recorder.requestPermission()
                         withAnimation { position = .userLocation(fallback: .automatic) }
@@ -148,12 +162,26 @@ struct ExploreMapView: View {
         }
     }
 
+    /// 拡大・縮小（factor < 1 で拡大、> 1 で縮小）。日本全体〜数 km の範囲に収める
+    private func zoom(by factor: Double) {
+        guard let r = currentRegion else { return }
+        let lat = min(12, max(0.02, r.span.latitudeDelta * factor))
+        let lng = min(12, max(0.02, r.span.longitudeDelta * factor))
+        withAnimation(.easeInOut(duration: 0.25)) {
+            position = .region(MKCoordinateRegion(center: r.center, span: MKCoordinateSpan(latitudeDelta: lat, longitudeDelta: lng)))
+        }
+    }
+
     private func load(center: CLLocationCoordinate2D, span: MKCoordinateSpan) async {
-        if let last = lastCenter, GeoUtils.distance(last, center) < 2000 { return }
+        // 中心が動いたとき、または縮尺が 2 割以上変わったときだけ読み直す
+        let spanChanged = lastSpanLat == 0 || abs(span.latitudeDelta - lastSpanLat) / lastSpanLat > 0.2
+        if let last = lastCenter, GeoUtils.distance(last, center) < 2000, !spanChanged { return }
         lastCenter = center
+        lastSpanLat = span.latitudeDelta
         isLoading = true
         defer { isLoading = false }
-        let radius = max(15_000, min(200_000, span.latitudeDelta * 111_000))
+        // 画面の対角線の半分ほどを取得半径に。上限は日本全体が入る 1,200 km
+        let radius = max(15_000, min(1_200_000, span.latitudeDelta * 111_000 * 0.9))
         do {
             roads = try await app.backend.nearbyRoads(center: center, radiusMeters: radius)
         } catch {
