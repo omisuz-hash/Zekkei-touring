@@ -20,11 +20,14 @@ struct RoadDetailView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    hero
                     header
                     routeRow
                     HStack(spacing: 8) {
-                        StatTile(caption: "スコア", value: road.overallScore.map { String(format: "%.1f", $0) } ?? "–", note: "\(road.ratingCount) 件", valueColor: ZK.tier1)
-                        StatTile(caption: "絶景度", value: road.avgScenery.map { String(format: "%.1f", $0) } ?? "–", note: road.avgScenery.map { $0 >= 4.5 ? "最高評価" : "5 点満点" } ?? "評価待ち")
+                        StatTile(caption: "スコア", value: road.overallScore.map { String(format: "%.1f", $0) } ?? "–",
+                                 note: road.ratingCount > 0 ? "\(road.ratingCount) 件" : (road.isProvisional ? "動画から推定" : "評価待ち"), valueColor: ZK.tier1)
+                        StatTile(caption: "絶景度", value: road.displayScenery.map { String(format: "%.1f", $0) } ?? "–",
+                                 note: road.ratingCount > 0 ? (road.avgScenery.map { $0 >= 4.5 ? "最高評価" : "5 点満点" } ?? "") : (road.isProvisional ? "動画から推定" : "評価待ち"))
                         StatTile(caption: "動画", value: "\(videos.count)", note: "YouTube")
                     }
                     // 主操作（閲覧枠を使う / ログイン）は半分の高さでも見える位置に置く
@@ -70,6 +73,56 @@ struct RoadDetailView: View {
     }
 
     // MARK: 部品
+
+    /// ヒーロー: 代表写真（無ければ動画のサムネイル）と、道全体が収まる地図
+    private var hero: some View {
+        VStack(spacing: 8) {
+            if let url = heroImageURL {
+                AsyncImage(url: url) { phase in
+                    if case .success(let img) = phase { img.resizable().scaledToFill() } else { Color.white.opacity(0.05) }
+                }
+                .frame(height: 190).frame(maxWidth: .infinity).clipped()
+                .overlay(alignment: .bottomLeading) {
+                    LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .center, endPoint: .bottom)
+                    if let top = videos.first, road.coverPath == nil {
+                        Text(top.channel.map { "▶ \($0)" } ?? "▶ YouTube").font(.system(size: 10, weight: .semibold)).foregroundStyle(.white.opacity(0.85)).padding(10)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            Map(initialPosition: .region(region)) {
+                MapPolyline(coordinates: road.coordinates).stroke(ZK.color(for: road).opacity(0.35), lineWidth: 14)
+                MapPolyline(coordinates: road.coordinates).stroke(ZK.color(for: road), lineWidth: 5)
+                if let s = road.coordinates.first { Annotation("", coordinate: s) { pin("S") } }
+                if let e = road.coordinates.last { Annotation("", coordinate: e) { pin("E") } }
+            }
+            .mapStyle(.hybrid(elevation: .flat))
+            .mapControlVisibility(.hidden)
+            .frame(height: heroImageURL == nil ? 220 : 160)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(ZK.border, lineWidth: 1))
+        }
+    }
+
+    private func pin(_ t: String) -> some View {
+        Text(t).font(.system(size: 9, weight: .heavy)).foregroundStyle(ZK.primaryButtonText)
+            .frame(width: 18, height: 18).background(ZK.tier1).clipShape(Circle())
+            .overlay(Circle().stroke(.black.opacity(0.5), lineWidth: 1))
+    }
+
+    private var heroImageURL: URL? {
+        if let cover = road.coverPath, let u = app.backend.publicURL(bucket: MediaKind.photo.bucket, path: cover) { return u }
+        if let top = videos.first { return URL(string: "https://i.ytimg.com/vi/\(top.videoId)/hqdefault.jpg") }
+        return nil
+    }
+
+    private var region: MKCoordinateRegion {
+        let c = GeoUtils.center(of: road.coordinates) ?? CLLocationCoordinate2D(latitude: 36, longitude: 138)
+        let lats = road.coordinates.map(\.latitude), lngs = road.coordinates.map(\.longitude)
+        return MKCoordinateRegion(center: c, span: MKCoordinateSpan(
+            latitudeDelta: max(0.03, ((lats.max() ?? 0) - (lats.min() ?? 0)) * 1.5),
+            longitudeDelta: max(0.03, ((lngs.max() ?? 0) - (lngs.min() ?? 0)) * 1.5)))
+    }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -144,7 +197,7 @@ struct RoadDetailView: View {
 
     @ViewBuilder private var unlockedContent: some View {
         VStack(alignment: .leading, spacing: 10) {
-            CaptionLabel(text: "ライダーの評価")
+            CaptionLabel(text: road.ratingCount > 0 ? "ライダーの評価" : "動画からの推定値（ライダー評価が付くと置き換わります）")
             ForEach(RatingAxis.allCases) { axis in
                 AxisBar(title: axis.title, value: value(for: axis))
             }
@@ -219,11 +272,11 @@ struct RoadDetailView: View {
 
     private func value(for axis: RatingAxis) -> Double? {
         switch axis {
-        case .scenery: return road.avgScenery
-        case .rideQuality: return road.avgRideQuality
-        case .winding: return road.avgWinding
-        case .restStops: return road.avgRestStops
-        case .parking: return road.avgParking
+        case .scenery: return road.displayScenery
+        case .rideQuality: return road.displayRideQuality
+        case .winding: return road.displayWinding
+        case .restStops: return road.displayRestStops
+        case .parking: return road.displayParking
         }
     }
 

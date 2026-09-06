@@ -15,38 +15,31 @@ struct ExploreMapView: View {
     @State private var spanLat: Double = 1.5
     @FocusState private var searchFocused: Bool
 
-    /// 広域ではタグを絞る（密集を防ぐ）。拡大するほど多く出す
+    /// 全部の道にタグを出す。目立つ道ほど後に描いて、重なったときに上に来るようにする
     private var taggedRoads: [ZekkeiRoad] {
-        let limit: Int
-        switch spanLat {
-        case ..<0.25: limit = 200
-        case ..<0.6: limit = 40
-        case ..<1.2: limit = 15
-        default: limit = 6
-        }
-        return Array(roads.sorted { ($0.ratingCount, $0.avgScenery ?? 0) > ($1.ratingCount, $1.avgScenery ?? 0) }.prefix(limit))
+        roads.sorted { $0.prominence < $1.prominence }
     }
 
     var body: some View {
         ZStack(alignment: .top) {
             Map(position: $position, selection: $selected) {
                 UserAnnotation()
-                ForEach(roads) { road in
-                    let color = ZK.tier(scenery: road.avgScenery, count: road.ratingCount)
-                    let strong = (road.avgScenery ?? 0) >= 3.5 && road.ratingCount > 0
+                ForEach(taggedRoads) { road in
+                    let color = ZK.color(for: road)
+                    let level = road.tagLevel
                     // 外側グロー → 本線 → 中央ハイライト（絶景度 4.5 以上）
-                    if strong {
-                        MapPolyline(coordinates: road.coordinates).stroke(color.opacity(0.35), lineWidth: (road.avgScenery ?? 0) >= 4.5 ? 16 : 12)
+                    if level >= 1 {
+                        MapPolyline(coordinates: road.coordinates).stroke(color.opacity(0.35), lineWidth: level >= 2 ? 16 : 12)
                     }
                     MapPolyline(coordinates: road.coordinates).stroke(color, lineWidth: lineWidth(road))
-                    if (road.avgScenery ?? 0) >= 4.5 && road.ratingCount > 0 {
+                    if level >= 2 {
                         MapPolyline(coordinates: road.coordinates).stroke(Color.white.opacity(0.7), lineWidth: 1.2)
                     }
                 }
                 ForEach(taggedRoads) { road in
                     if let start = road.coordinates.first {
                         Annotation(road.name, coordinate: start, anchor: .bottomLeading) {
-                            CodeTag(code: road.shortCode, fromVideo: road.isFromVideos, muted: road.ratingCount == 0)
+                            CodeTag(code: road.shortCode, fromVideo: road.isFromVideos, muted: road.displayScenery == nil, level: road.tagLevel)
                                 .onTapGesture { selected = road }
                         }
                         .tag(road)
@@ -110,7 +103,7 @@ struct ExploreMapView: View {
     }
 
     private func lineWidth(_ road: ZekkeiRoad) -> CGFloat {
-        let base: CGFloat = (road.avgScenery ?? 0) >= 4.5 && road.ratingCount > 0 ? 5 : ((road.avgScenery ?? 0) >= 3.5 && road.ratingCount > 0 ? 4 : 3.5)
+        let base: CGFloat = road.tagLevel >= 2 ? 5 : (road.tagLevel == 1 ? 4 : 3)
         return app.isUnlocked(road) ? base + 1.5 : base
     }
 

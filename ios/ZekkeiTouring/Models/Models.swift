@@ -106,6 +106,29 @@ struct ZekkeiRoad: Codable, Identifiable, Hashable {
     var source: String?
     /// gps / routed / approx
     var geometryQuality: String?
+    /// 動画から推定した示唆値（ライダー評価が付くまでの暫定）
+    var hintScenery: Double?
+    var hintWinding: Double?
+    var hintSurface: Double?
+    var hintRest: Double?
+    var hintParking: Double?
+    /// 動画での言及数
+    var mentionCount: Int?
+
+    /// 表示に使う絶景度: ライダー評価があればそれ、無ければ動画からの推定
+    var displayScenery: Double? { ratingCount > 0 ? avgScenery : hintScenery }
+    var displayRideQuality: Double? { ratingCount > 0 ? avgRideQuality : hintSurface }
+    var displayWinding: Double? { ratingCount > 0 ? avgWinding : hintWinding }
+    var displayRestStops: Double? { ratingCount > 0 ? avgRestStops : hintRest }
+    var displayParking: Double? { ratingCount > 0 ? avgParking : hintParking }
+    /// 表示スコアが動画からの推定か
+    var isProvisional: Bool { ratingCount == 0 && hintScenery != nil }
+    /// 目立たせ度 0...1（絶景度と言及数）
+    var prominence: Double {
+        let s = (displayScenery ?? 0) / 5
+        let m = min(1, log(Double((mentionCount ?? 0) + ratingCount) + 1) / log(40))
+        return s * 0.7 + m * 0.3
+    }
 
     var coordinates: [CLLocationCoordinate2D] { geojson.points }
     /// 動画から自動抽出された道か（ユーザーの実走ではない）
@@ -119,10 +142,10 @@ struct ZekkeiRoad: Codable, Identifiable, Hashable {
     }
     var lengthKmText: String { String(format: "%.1f km", lengthM / 1000) }
 
-    /// 総合スコア（絶景度を重視した加重平均）
+    /// 総合スコア（絶景度を重視した加重平均）。評価が無ければ動画からの推定
     var overallScore: Double? {
-        guard let s = avgScenery else { return nil }
-        let others = [avgRideQuality, avgWinding, avgRestStops, avgParking].compactMap { $0 }
+        guard let s = displayScenery else { return nil }
+        let others = [displayRideQuality, displayWinding, displayRestStops, displayParking].compactMap { $0 }
         let othersAvg = others.isEmpty ? s : others.reduce(0, +) / Double(others.count)
         return s * 0.6 + othersAvg * 0.4
     }
@@ -149,6 +172,12 @@ struct ZekkeiRoad: Codable, Identifiable, Hashable {
         case coverPath = "cover_path"
         case source
         case geometryQuality = "geometry_quality"
+        case hintScenery = "hint_scenery"
+        case hintWinding = "hint_winding"
+        case hintSurface = "hint_surface"
+        case hintRest = "hint_rest"
+        case hintParking = "hint_parking"
+        case mentionCount = "mention_count"
     }
 }
 

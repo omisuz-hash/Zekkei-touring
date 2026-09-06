@@ -45,13 +45,15 @@ enum ZK {
     static let errorText = Color(hex: 0xFF6B61)
     static let paused = Color(hex: 0xFFD166)
 
-    /// 絶景度から線の色
-    static func tier(scenery: Double?, count: Int) -> Color {
-        guard let s = scenery, count > 0 else { return tier3 }
+    /// 絶景度から線の色（評価が無ければ動画からの推定値を使う）
+    static func tier(scenery: Double?, count: Int = 1) -> Color {
+        guard let s = scenery else { return tier3 }
         if s >= 4.5 { return tier1 }
         if s >= 3.5 { return tier2 }
         return tier3
     }
+    /// 道の表示色
+    static func color(for road: ZekkeiRoad) -> Color { tier(scenery: road.displayScenery) }
 }
 
 // MARK: - 文字
@@ -139,21 +141,35 @@ struct DangerButtonStyle: ButtonStyle {
     }
 }
 
-/// 空港コード風タグ（▶ VENUS / ★ R142）
+/// 空港コード風タグ（▶ VENUS / ★ R142）。絶景度で大きさ・太さ・明るさが 3 段階
 struct CodeTag: View {
     let code: String
     var fromVideo: Bool = true
     var muted: Bool = false
+    /// 0 = 控えめ、1 = 標準、2 = 強調
+    var level: Int = 1
     var body: some View {
+        let size: CGFloat = level >= 2 ? 13 : (level == 1 ? 10.5 : 9)
+        let weight: Font.Weight = level >= 2 ? .heavy : (level == 1 ? .bold : .medium)
+        let border = muted ? ZK.tier3 : (level >= 2 ? ZK.tier1 : ZK.accent)
         HStack(spacing: 4) {
-            Image(systemName: fromVideo ? "play.fill" : "star.fill").font(.system(size: 8, weight: .bold))
-            Text(code).font(.system(size: 10, weight: .bold)).tracking(0.5)
+            Image(systemName: fromVideo ? "play.fill" : "star.fill").font(.system(size: size * 0.75, weight: .bold))
+            Text(code).font(.system(size: size, weight: weight)).tracking(0.4)
         }
-        .foregroundStyle(muted ? ZK.caption : .white)
-        .padding(.horizontal, 8).padding(.vertical, 5)
-        .background(muted ? Color(hex: 0x1A2126) : ZK.tagBg)
+        .foregroundStyle(muted ? ZK.caption : (level >= 2 ? ZK.tier1 : .white))
+        .padding(.horizontal, level >= 2 ? 10 : 8).padding(.vertical, level >= 2 ? 6 : 5)
+        .background(muted ? Color(hex: 0x1A2126).opacity(0.85) : ZK.tagBg.opacity(level == 0 ? 0.8 : 1))
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(muted ? ZK.tier3 : ZK.accent, lineWidth: 1.2))
+        .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(border, lineWidth: level >= 2 ? 1.6 : 1.2))
+        .shadow(color: level >= 2 ? ZK.tier1.opacity(0.45) : .clear, radius: 6)
+    }
+}
+
+extension ZekkeiRoad {
+    /// タグの強調段階: 絶景度 4.5 以上 = 2、3.5 以上 = 1、それ未満・不明 = 0
+    var tagLevel: Int {
+        guard let s = displayScenery else { return 0 }
+        return s >= 4.5 ? 2 : (s >= 3.5 ? 1 : 0)
     }
 }
 
