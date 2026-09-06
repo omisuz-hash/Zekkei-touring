@@ -52,11 +52,12 @@ def find_wikipedia_image(name: str, lat: float, lng: float, max_dist_m: float = 
     return None
 
 
-def find_commons_photo(lat: float, lng: float, name: str, radius_m: int = 500) -> dict | None:
-    """返り値: {url, credit, title} または None"""
+def find_commons_photo(lat: float, lng: float, name: str, radius_m: int = 2500, near_m: float = 800) -> dict | None:
+    """地点の周辺 radius_m の写真から選ぶ。名前が一致する写真、または near_m 以内の写真だけを採用。
+    返り値: {url, credit, title} または None"""
     _pace()
     res = request(COMMONS, params={"action": "query", "format": "json", "list": "geosearch", "gscoord": f"{lat}|{lng}",
-                                   "gsradius": radius_m, "gsnamespace": 6, "gslimit": 30}, headers={"User-Agent": UA}, timeout=30)
+                                   "gsradius": min(radius_m, 10000), "gsnamespace": 6, "gslimit": 50}, headers={"User-Agent": UA}, timeout=30)
     hits = res.get("query", {}).get("geosearch", [])
     if not hits:
         return None
@@ -80,11 +81,15 @@ def find_commons_photo(lat: float, lng: float, name: str, radius_m: int = 500) -
         w, h = ii.get("width", 0), ii.get("height", 0)
         if w < 640 or h < 400:
             continue
+        matched = sum(1 for t in toks if t.lower() in low)
+        d = dist.get(pid, 0)
+        if not matched and d > near_m:
+            continue
         score = 0.0
-        score += 3.0 * sum(1 for t in toks if t.lower() in low)
+        score += 3.0 * matched
         score += 1.0 if w > h else -0.5                  # 横長を優先
         score += min(w, 3000) / 3000                       # 解像度
-        score -= dist.get(pid, 0) / 500                    # 近いほど良い
+        score -= d / 1000                                  # 近いほど良い
         if score > best_score:
             best_score, best = score, (ii, title)
     if not best:

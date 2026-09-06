@@ -246,7 +246,8 @@ class Store:
         self.db.commit()
 
     def reset_photos(self) -> int:
-        cur = self.db.execute("update spots set photo_status='pending' where photo_url is null")
+        # 本物の写真（Commons / Wikipedia）が無いものを全て探し直す。動画サムネイルで埋めたものも含む
+        cur = self.db.execute("update spots set photo_status='pending' where photo_url is null or coalesce(photo_source,'') not in ('commons','wikipedia')")
         self.db.commit()
         return cur.rowcount
 

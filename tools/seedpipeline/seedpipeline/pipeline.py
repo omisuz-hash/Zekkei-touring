@@ -198,19 +198,24 @@ class Pipeline:
     def photos(self, limit: int | None = None) -> int:
         from .photos import find_commons_photo, find_wikipedia_image
         n = 0
+        tally = {"commons": 0, "wikipedia": 0, "youtube": 0, "none": 0, "error": 0}
+        first_error = None
         for sp in self.store.spots_pending_photo(limit or self.cfg.max_photos_per_run):
             url = credit = source = None
-            # 1) Commons: 地点の近くの写真。展望台・峠は山頂付近に写真が散らばるので広めに探す
+            # 1) Commons: 地点の周辺の写真。展望台・峠・温泉は広めに、飲食店は店の近くだけ
+            wide = sp["kind"] in ("viewpoint", "pass", "onsen", "rest")
             try:
-                hit = find_commons_photo(sp["lat"], sp["lng"], sp["name"], radius_m=1000 if sp["kind"] in ("viewpoint", "pass") else 500)
+                hit = find_commons_photo(sp["lat"], sp["lng"], sp["name"], radius_m=3000 if wide else 1500, near_m=1000 if wide else 400)
                 if hit:
                     url, credit, source = hit["url"], hit["credit"], "commons"
             except HTTPError as e:
                 if e.status == 429:
                     log("Wikimedia の呼び出し制限に達したため写真を中断します（次回に続きから再開）")
                     break
+                tally["error"] += 1; first_error = first_error or str(e)
                 log(f"写真 NG: {sp['name']} ({e})")
             except Exception as e:
+                tally["error"] += 1; first_error = first_error or repr(e)
                 log(f"写真 NG: {sp['name']} ({e})")
             # 2) 日本語 Wikipedia の記事画像（峠・展望台・道の駅は記事があることが多い）
             if not url:
@@ -226,9 +231,12 @@ class Pipeline:
                 if vid:
                     url, credit, source = f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg", "YouTube", "youtube"
             self.store.save_photo(sp["road_id"], sp["name"], url, credit, source)
+            tally[source or "none"] = tally.get(source or "none", 0) + 1
             if url:
                 n += 1
                 log(f"写真 {sp['name']} ← {source}")
+        log(f"写真の集計: Commons {tally['commons']} / Wikipedia {tally['wikipedia']} / 動画 {tally['youtube']} / 無し {tally['none']} / エラー {tally['error']}"
+            + (f"（最初のエラー: {first_error[:200]}）" if first_error else ""))
         return n
 
     def retry_photos(self) -> int:

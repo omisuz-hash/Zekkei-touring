@@ -209,6 +209,9 @@ struct RoadDetailView: View {
 
     private var heroImageURL: URL? {
         if let cover = road.coverPath, let u = app.backend.publicURL(bucket: MediaKind.photo.bucket, path: cover) { return u }
+        // スポットに本物の写真（Commons / Wikipedia）があれば、展望台を優先してヒーローに使う
+        let real = spots.filter { $0.photoSource == "commons" || $0.photoSource == "wikipedia" }
+        if let sp = real.first(where: { $0.kind == "viewpoint" }) ?? real.first, let u = sp.photoURL { return u }
         if let top = videos.first { return URL(string: "https://i.ytimg.com/vi/\(top.videoId)/hqdefault.jpg") }
         return nil
     }

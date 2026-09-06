@@ -46,9 +46,9 @@ def export_sql(store, path: str, min_confidence: float = 0.5, min_mentions: int 
         lines.append(") as v(video_id, url, title, channel, view_count, ts)")
         lines.append("on conflict (road_id, video_id) do nothing;")
         spots = store.road_spots(r["id"]) if hasattr(store, "road_spots") else []
-        for s in spots:
+        for i, s in enumerate(spots):
             if not s.get("photo_url"):
-                vid = s.get("video_id") or (top["video_id"] if top else None)
+                vid = s.get("video_id") or (vids[(i + 1) % len(vids)]["video_id"] if vids else None)
                 if vid:
                     s["photo_url"], s["photo_credit"], s["photo_source"] = f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg", "YouTube", "youtube"
         if spots:
