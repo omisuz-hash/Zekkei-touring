@@ -150,7 +150,8 @@ def cmd_seed():
     stmts = [s for s in split_statements(sql) if "insert into public." in s]
     n_roads = sum(1 for s in stmts if "insert into public.zekkei_roads" in s)
     n_spots = sum(1 for s in stmts if "insert into public.road_spots" in s)
-    print(f"自動収集シード {os.path.basename(latest)}: 道 {n_roads} 本、スポット付きの道 {n_spots} 本を流し込みます")
+    n_photo = sum(s.count("'commons')") + s.count("'wikipedia')") + s.count("'youtube')") for s in stmts if "insert into public.road_spots" in s)
+    print(f"自動収集シード {os.path.basename(latest)}: 道 {n_roads} 本、スポット付きの道 {n_spots} 本（写真付きスポット {n_photo} 件）を流し込みます")
     ok = ng = 0
     batch = 25
     for i in range(0, len(stmts), batch):
