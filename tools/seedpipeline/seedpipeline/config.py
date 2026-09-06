@@ -27,6 +27,7 @@ class Config:
     max_video_analyses_per_run: int = field(default_factory=lambda: int(_env("SEED_MAX_VIDEO_ANALYSES", "20")))
     # 1 回の実行で形状を付ける道の上限
     max_geo_per_run: int = field(default_factory=lambda: int(_env("SEED_MAX_GEO", "600")))
+    max_spots_per_run: int = field(default_factory=lambda: int(_env("SEED_MAX_SPOTS", "300")))
     # 当たりチャンネルの投稿一覧を 1 回の実行でたどる数
     channels_per_run: int = field(default_factory=lambda: int(_env("SEED_CHANNELS_PER_RUN", "5")))
     # 動画の長さ（秒）。短すぎる（Shorts）と長すぎる（生配信）は除外

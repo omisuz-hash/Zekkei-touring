@@ -9,6 +9,7 @@ struct RoadDetailView: View {
     @State private var ratings: [RoadRating] = []
     @State private var media: [RoadMedia] = []
     @State private var videos: [RoadVideo] = []
+    @State private var spots: [RoadSpot] = []
     @State private var viewing: RoadMedia?
     @State private var showReport = false
     @State private var reportReason = ""
@@ -23,6 +24,7 @@ struct RoadDetailView: View {
                     hero
                     header
                     routeRow
+                    if !spots.isEmpty { spotSection }
                     HStack(spacing: 8) {
                         StatTile(caption: "スコア", value: road.overallScore.map { String(format: "%.1f", $0) } ?? "–",
                                  note: road.ratingCount > 0 ? "\(road.ratingCount) 件" : (road.isProvisional ? "動画から推定" : "評価待ち"), valueColor: ZK.tier1)
@@ -62,6 +64,13 @@ struct RoadDetailView: View {
                 MediaViewer(media: m, url: app.backend.publicURL(bucket: m.bucket, path: m.storagePath))
             }
             .task { videos = (try? await app.backend.videos(for: road.id)) ?? [] }
+            .task {
+                // 動画から抽出したスポットを先に出し、Apple の地図データで展望台・道の駅を補う
+                let fromVideos = (try? await app.backend.spots(for: road.id)) ?? []
+                spots = fromVideos
+                let extra = await SpotFinder.nearby(road: road, excluding: fromVideos)
+                if !extra.isEmpty { spots = fromVideos + extra }
+            }
             .task(id: unlocked) {
                 guard unlocked else { return }
                 ratings = (try? await app.backend.ratings(for: road.id)) ?? []
@@ -95,6 +104,10 @@ struct RoadDetailView: View {
                 MapPolyline(coordinates: road.coordinates).stroke(ZK.color(for: road), lineWidth: 5)
                 if let s = road.coordinates.first { Annotation("", coordinate: s) { pin("S") } }
                 if let e = road.coordinates.last { Annotation("", coordinate: e) { pin("E") } }
+                ForEach(spots) { sp in
+                    Annotation(sp.name, coordinate: sp.coordinate, anchor: .bottom) { spotPin(sp) }
+                        .annotationTitles(.hidden)
+                }
             }
             .mapStyle(.hybrid(elevation: .flat))
             .mapControlVisibility(.hidden)
@@ -109,6 +122,51 @@ struct RoadDetailView: View {
             }
             .contentShape(Rectangle())
             .onTapGesture { openNavigation() }
+        }
+    }
+
+    /// スポットのピン。動画由来は明るく、Apple の地図データ由来は控えめに
+    private func spotPin(_ sp: RoadSpot) -> some View {
+        Image(systemName: sp.icon).font(.system(size: 9, weight: .bold))
+            .foregroundStyle(sp.isFromVideo ? ZK.primaryButtonText : .white)
+            .frame(width: 20, height: 20)
+            .background(sp.isFromVideo ? ZK.accent : Color.black.opacity(0.55))
+            .clipShape(Circle())
+            .overlay(Circle().stroke(sp.isFromVideo ? .white.opacity(0.9) : .white.opacity(0.4), lineWidth: 1))
+    }
+
+    /// 立ち寄りスポット: タップで Google マップにその場所を表示
+    private var spotSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                CaptionLabel(text: "立ち寄りスポット")
+                Spacer()
+                if spots.contains(where: { $0.isFromVideo }) {
+                    Text("● 動画で紹介").font(.system(size: 9, weight: .semibold)).foregroundStyle(ZK.accent)
+                }
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(spots) { sp in
+                        Button {
+                            if let u = sp.googleMapsURL { UIApplication.shared.open(u) }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: sp.icon).font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(sp.isFromVideo ? ZK.accent : ZK.caption)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(sp.name).font(.system(size: 12, weight: .bold)).foregroundStyle(.white).lineLimit(1)
+                                    Text(sp.note?.isEmpty == false ? sp.note! : sp.kindLabel).font(.system(size: 9)).foregroundStyle(ZK.caption).lineLimit(1)
+                                }
+                            }
+                            .padding(.horizontal, 10).frame(height: 40)
+                            .background(sp.isFromVideo ? ZK.tagBg : .clear)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(sp.isFromVideo ? ZK.accent.opacity(0.6) : ZK.chipBorder, lineWidth: 1))
+                        }
+                    }
+                }
+            }
         }
     }
 

@@ -153,6 +153,8 @@ def main():
     g = sub.add_parser("georeference", help="地図 API で形状を付ける"); g.add_argument("--limit", type=int, default=200)
     rp = sub.add_parser("repair", help="座標にできなかった道を Gemini の一般知識で言い直して再試行"); rp.add_argument("--limit", type=int, default=100)
     sub.add_parser("dedupe", help="重複統合")
+    sp = sub.add_parser("spots", help="展望台・飲食店・道の駅などを道の近くに位置付ける"); sp.add_argument("--limit", type=int)
+    sub.add_parser("retry-spots", help="全ての道のスポットを位置付けし直す")
     x = sub.add_parser("export", help="SQL / GeoJSON / レポートを出力"); x.add_argument("--out", default="out"); x.add_argument("--min-confidence", type=float, default=0.5); x.add_argument("--min-scenery", type=float, default=2.5)
     sub.add_parser("stats")
     i = sub.add_parser("import-json", help="tools/youtube の取得結果を取り込む"); i.add_argument("path")
@@ -184,6 +186,10 @@ def main():
         n = p.repair(args.limit); log(f"修復候補 {n} 本 → 形状 OK {p.georeference() if n else 0} 本")
     elif args.cmd == "dedupe":
         log(f"統合 {p.dedupe()} 組")
+    elif args.cmd == "spots":
+        print(f"スポット {p.spots(args.limit)} 件")
+    elif args.cmd == "retry-spots":
+        print(f"{p.retry_spots()} 本の道を対象に戻しました")
     elif args.cmd == "export":
         cmd_export(p, args.out, args.min_confidence, args.min_scenery)
     elif args.cmd == "stats":

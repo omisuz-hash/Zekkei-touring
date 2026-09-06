@@ -72,12 +72,20 @@ final class SupabaseBackend: Backend {
 
     // MARK: 絶景道
 
-    func nearbyRoads(center: CLLocationCoordinate2D, radiusMeters: Double) async throws -> [ZekkeiRoad] {
+    func nearbyRoads(center: CLLocationCoordinate2D, radiusMeters: Double, limit: Int) async throws -> [ZekkeiRoad] {
         try await client.rpc("nearby_roads", params: [
             "p_lat": center.latitude,
             "p_lng": center.longitude,
             "p_radius_m": radiusMeters,
+            "p_limit": Double(limit),
         ]).execute().value
+    }
+
+    func spots(for roadId: UUID) async throws -> [RoadSpot] {
+        try await client.from("road_spots").select()
+            .eq("road_id", value: roadId.uuidString)
+            .order("kind")
+            .execute().value
     }
 
     func road(id: UUID) async throws -> ZekkeiRoad? {

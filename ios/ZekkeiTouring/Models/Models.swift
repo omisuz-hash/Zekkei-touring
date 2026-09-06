@@ -230,6 +230,49 @@ struct RoadDraft: Codable {
 
 // MARK: - 道に紐づく動画
 
+/// 立ち寄りスポット（展望台・飲食店・道の駅・峠・温泉）。動画から自動抽出したもの、または投稿者が登録したもの
+struct RoadSpot: Codable, Identifiable, Hashable {
+    var id: UUID
+    var roadId: UUID
+    var name: String
+    var kind: String
+    var lat: Double
+    var lng: Double
+    var note: String?
+    var source: String?
+    var videoId: String?
+
+    var coordinate: CLLocationCoordinate2D { CLLocationCoordinate2D(latitude: lat, longitude: lng) }
+    var isFromVideo: Bool { source == "seed_auto" }
+
+    var kindLabel: String {
+        switch kind {
+        case "viewpoint": return "展望"
+        case "food": return "グルメ"
+        case "rest": return "休憩"
+        case "pass": return "峠"
+        case "onsen": return "温泉"
+        default: return "スポット"
+        }
+    }
+    var icon: String {
+        switch kind {
+        case "viewpoint": return "binoculars.fill"
+        case "food": return "fork.knife"
+        case "rest": return "cup.and.saucer.fill"
+        case "pass": return "mountain.2.fill"
+        case "onsen": return "drop.fill"
+        default: return "mappin"
+        }
+    }
+    /// Google マップでこの場所を開く
+    var googleMapsURL: URL? {
+        var c = URLComponents(string: "https://www.google.com/maps/search/")!
+        c.queryItems = [URLQueryItem(name: "api", value: "1"), URLQueryItem(name: "query", value: String(format: "%.5f,%.5f", lat, lng))]
+        return c.url
+    }
+}
+
 struct RoadVideo: Codable, Identifiable, Hashable {
     var id: Int64
     var roadId: UUID

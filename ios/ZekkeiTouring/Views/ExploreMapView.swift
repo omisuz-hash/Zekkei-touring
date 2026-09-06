@@ -182,8 +182,10 @@ struct ExploreMapView: View {
         defer { isLoading = false }
         // 画面の対角線の半分ほどを取得半径に。上限は日本全体が入る 1,200 km
         let radius = max(15_000, min(1_200_000, span.latitudeDelta * 111_000 * 0.9))
+        // 引いて見ているときは目立つ道だけに絞る（描画を軽くする）: 県〜地方 1,500 / 広域 800 / 日本全体 500
+        let limit = span.latitudeDelta <= 1.0 ? 1500 : (span.latitudeDelta <= 3.0 ? 800 : 500)
         do {
-            roads = try await app.backend.nearbyRoads(center: center, radiusMeters: radius)
+            roads = try await app.backend.nearbyRoads(center: center, radiusMeters: radius, limit: limit)
         } catch {
             app.lastError = error.localizedDescription
         }

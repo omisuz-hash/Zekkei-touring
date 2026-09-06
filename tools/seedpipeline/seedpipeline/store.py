@@ -27,6 +27,10 @@ create table if not exists road_videos (
   road_id integer, video_id text, timestamp text, evidence text, confidence real,
   primary key (road_id, video_id)
 );
+create table if not exists spots (
+  road_id integer, name text, kind text, lng real, lat real, note text, video_id text,
+  primary key (road_id, name)
+);
 create table if not exists channels (
   id text primary key, title text, crawled integer default 0, hits integer default 0, videos integer default 0
 );
@@ -35,6 +39,9 @@ create table if not exists quota (day text primary key, youtube_units integer de
 create table if not exists searches (keyword text, page integer, done integer default 0, primary key (keyword, page));
 create table if not exists geocache (q text primary key, lng real, lat real, pref text, addr text, created_at text);
 """
+
+
+SPOT_KINDS = ("viewpoint", "food", "rest", "pass", "onsen", "other")
 
 
 def _num(v, lo: float, hi: float, as_int: bool = False):
@@ -60,6 +67,14 @@ def clean_road(road: dict) -> dict:
         v = r.get(k)
         r[k] = (str(v).strip()[:500] if v is not None else "")
     r["via_labels"] = [str(v).strip()[:100] for v in (r.get("via_labels") or []) if v][:6]
+    spots = []
+    for sp in (r.get("spots") or [])[:8]:
+        if not isinstance(sp, dict) or not sp.get("name"):
+            continue
+        kind = str(sp.get("kind") or "other").strip()
+        spots.append({"name": str(sp["name"]).strip()[:100], "kind": kind if kind in SPOT_KINDS else "other",
+                      "municipality": str(sp.get("municipality") or "").strip()[:50], "note": str(sp.get("note") or "").strip()[:200]})
+    r["spots"] = spots
     return r
 
 
@@ -71,7 +86,8 @@ class Store:
         self.db.executescript(SCHEMA)
         # 既存 DB への列追加（あれば無視）
         cols = {r[1] for r in self.db.execute("pragma table_info(roads)")}
-        for col, typ in (("start_municipality", "text"), ("end_municipality", "text"), ("approx_length_km", "real"), ("repair_attempts", "integer default 0")):
+        for col, typ in (("start_municipality", "text"), ("end_municipality", "text"), ("approx_length_km", "real"), ("repair_attempts", "integer default 0"),
+                         ("spots", "text"), ("spots_status", "text default 'pending'")):
             if col not in cols:
                 self.db.execute(f"alter table roads add column {col} {typ}")
         self.db.commit()
@@ -157,6 +173,7 @@ class Store:
                              road.get("season", ""), *[road.get(h) for h in hints], road.get("confidence", 0),
                              road.get("start_municipality", ""), road.get("end_municipality", ""), road.get("approx_length_km") or None))
             road_id = self.db.execute("select id from roads where key=?", (key,)).fetchone()["id"]
+            self._merge_spots(road_id, road.get("spots", []), video_id, [])
         else:
             road_id = r["id"]
             n = r["mentions"]
@@ -179,12 +196,49 @@ class Store:
             if road.get("approx_length_km") and not r["approx_length_km"]:
                 sets.append("approx_length_km=?"); vals.append(road["approx_length_km"])
             self.db.execute(f"update roads set {', '.join(sets)}, updated_at=datetime('now') where id=?", (*vals, road_id))
+            self._merge_spots(road_id, road.get("spots", []), video_id, json.loads(r["spots"] or "[]") if "spots" in r.keys() else [])
         cur = self.db.execute("insert or ignore into road_videos(road_id,video_id,timestamp,evidence,confidence) values (?,?,?,?,?)",
                               (road_id, video_id, road.get("timestamp", ""), road.get("evidence", ""), road.get("confidence", 0)))
         if cur.rowcount:
             self.db.execute("update roads set mentions=mentions+1 where id=?", (road_id,))
         self.db.commit()
         return road_id
+
+    def _merge_spots(self, road_id: int, new: list[dict], video_id: str, old: list[dict]):
+        """動画ごとのスポット候補を道に貯める（名前で重複排除）。増えたら位置付けをやり直す"""
+        if not new:
+            return
+        names = {s["name"] for s in old}
+        added = False
+        for sp in new:
+            if sp["name"] in names:
+                continue
+            old.append({**sp, "video_id": video_id})
+            names.add(sp["name"])
+            added = True
+        if added:
+            self.db.execute("update roads set spots=?, spots_status='pending' where id=?", (json.dumps(old, ensure_ascii=False), road_id))
+
+    # --- spots
+    def roads_pending_spots(self, limit: int) -> list[dict]:
+        return [dict(r) for r in self.db.execute(
+            "select * from roads where geo_status='ok' and coalesce(spots_status,'pending')='pending' order by mentions desc, confidence desc limit ?", (limit,))]
+
+    def save_spots(self, road_id: int, spots: list[dict]):
+        self.db.execute("delete from spots where road_id=?", (road_id,))
+        for sp in spots:
+            self.db.execute("insert or ignore into spots(road_id,name,kind,lng,lat,note,video_id) values (?,?,?,?,?,?,?)",
+                            (road_id, sp["name"], sp["kind"], sp["lng"], sp["lat"], sp.get("note", ""), sp.get("video_id", "")))
+        self.db.execute("update roads set spots_status='done' where id=?", (road_id,))
+        self.db.commit()
+
+    def road_spots(self, road_id: int) -> list[dict]:
+        return [dict(r) for r in self.db.execute("select * from spots where road_id=? order by kind, name", (road_id,))]
+
+    def reset_spots(self) -> int:
+        cur = self.db.execute("update roads set spots_status='pending' where geo_status='ok'")
+        self.db.commit()
+        return cur.rowcount
 
     def roads_pending_geo(self, limit: int) -> list[dict]:
         return [dict(r) for r in self.db.execute("select * from roads where geo_status='pending' order by mentions desc, confidence desc limit ?", (limit,))]
@@ -248,6 +302,8 @@ class Store:
 
     def _merge_rest(self, keep_id: int, drop_id: int):
         self.db.execute("insert or ignore into road_videos(road_id,video_id,timestamp,evidence,confidence) select ?,video_id,timestamp,evidence,confidence from road_videos where road_id=?", (keep_id, drop_id))
+        self.db.execute("insert or ignore into spots(road_id,name,kind,lng,lat,note,video_id) select ?,name,kind,lng,lat,note,video_id from spots where road_id=?", (keep_id, drop_id))
+        self.db.execute("delete from spots where road_id=?", (drop_id,))
         self.db.execute("delete from road_videos where road_id=?", (drop_id,))
         self.db.execute("update roads set mentions=(select count(*) from road_videos where road_id=?) where id=?", (keep_id, keep_id))
         self.db.execute("delete from roads where id=?", (drop_id,))
@@ -268,5 +324,7 @@ class Store:
         for r in self.db.execute("select geo_status, count(*) c from roads group by geo_status"):
             s[f"roads_{r['geo_status']}"] = r["c"]
         s["roads_total"] = self.db.execute("select count(*) from roads").fetchone()[0]
+        s["spots_total"] = self.db.execute("select count(*) from spots").fetchone()[0]
+        s["roads_spots_pending"] = self.db.execute("select count(*) from roads where geo_status='ok' and coalesce(spots_status,'pending')='pending'").fetchone()[0]
         s["channels"] = self.db.execute("select count(*) from channels").fetchone()[0]
         return s

@@ -15,13 +15,14 @@ protocol Backend: AnyObject {
     func profile() async throws -> Profile?
     func updatePrivacyZone(center: CLLocationCoordinate2D?, radiusMeters: Int) async throws
 
-    func nearbyRoads(center: CLLocationCoordinate2D, radiusMeters: Double) async throws -> [ZekkeiRoad]
+    func nearbyRoads(center: CLLocationCoordinate2D, radiusMeters: Double, limit: Int) async throws -> [ZekkeiRoad]
     func road(id: UUID) async throws -> ZekkeiRoad?
     func findOverlappingRoad(ewkt: String, minRatio: Double) async throws -> OverlapMatch?
     func createRoad(_ draft: RoadDraft) async throws -> ZekkeiRoad
     func submitRating(_ rating: RoadRating) async throws
     func ratings(for roadId: UUID) async throws -> [RoadRating]
     func videos(for roadId: UUID) async throws -> [RoadVideo]
+    func spots(for roadId: UUID) async throws -> [RoadSpot]
 
     func creditBalance() async throws -> Int
     func unlockedRoadIds() async throws -> Set<UUID>
@@ -95,7 +96,7 @@ final class MockBackend: Backend {
     }
     func updatePrivacyZone(center: CLLocationCoordinate2D?, radiusMeters: Int) async throws {}
 
-    func nearbyRoads(center: CLLocationCoordinate2D, radiusMeters: Double) async throws -> [ZekkeiRoad] { roads }
+    func nearbyRoads(center: CLLocationCoordinate2D, radiusMeters: Double, limit: Int) async throws -> [ZekkeiRoad] { Array(roads.prefix(limit)) }
     func road(id: UUID) async throws -> ZekkeiRoad? { roads.first { $0.id == id } }
     func findOverlappingRoad(ewkt: String, minRatio: Double) async throws -> OverlapMatch? { nil }
 
@@ -128,6 +129,14 @@ final class MockBackend: Backend {
     }
 
     func ratings(for roadId: UUID) async throws -> [RoadRating] { ratingsByRoad[roadId] ?? [] }
+    func spots(for roadId: UUID) async throws -> [RoadSpot] {
+        guard let road = roads.first(where: { $0.id == roadId }), let c = road.coordinates.dropFirst(road.coordinates.count / 2).first else { return [] }
+        return [
+            RoadSpot(id: UUID(), roadId: roadId, name: "見晴らし展望台", kind: "viewpoint", lat: c.latitude + 0.004, lng: c.longitude, note: "富士山が正面", source: "seed_auto", videoId: nil),
+            RoadSpot(id: UUID(), roadId: roadId, name: "峠の茶屋", kind: "food", lat: c.latitude - 0.003, lng: c.longitude + 0.004, note: "名物のきのこそば", source: "seed_auto", videoId: nil),
+        ]
+    }
+
     func videos(for roadId: UUID) async throws -> [RoadVideo] {
         guard let road = roads.first(where: { $0.id == roadId }), road.isSeed else { return [] }
         return [

@@ -173,6 +173,27 @@ class Pipeline:
             self.geo.calls = 0
         return ok
 
+    # 4c. スポット: 展望台・飲食店・道の駅などを道の近くに位置付ける ----------
+    def spots(self, limit: int | None = None) -> int:
+        from .spots import build_spots
+        n = 0
+        for r in self.store.roads_pending_spots(limit or self.cfg.max_spots_per_run):
+            try:
+                sps = build_spots(self.geo, r)
+            except Exception as e:  # 1 本の失敗で止めない
+                log(f"スポット NG: {r['name']} ({e})")
+                sps = []
+            self.store.save_spots(r["id"], sps)
+            n += len(sps)
+            if sps:
+                log(f"スポット {r['name']}: " + "、".join(f"{s['name']}({s['kind']})" for s in sps))
+            self.store.add_quota(geo_calls=getattr(self.geo, "calls", 0))
+            self.geo.calls = 0
+        return n
+
+    def retry_spots(self) -> int:
+        return self.store.reset_spots()
+
     # 4b. 修復: 座標にできなかった道を、Gemini の一般知識で言い直して再試行 ----------
     def repair(self, limit: int = 100) -> int:
         if not self.llm:
@@ -255,6 +276,7 @@ class Pipeline:
             if remaining == 0 or (fetched == 0 and extracted == 0 and geo == 0):
                 break
         self._stage("統合", self.dedupe)
+        self._stage("スポット", self.spots)
         log("== 集計 ==")
         for k, v in sorted(self.store.stats().items()):
             log(f"  {k}: {v}")

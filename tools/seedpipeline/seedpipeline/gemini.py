@@ -24,6 +24,21 @@ ROAD_SCHEMA = {
                     "end_municipality": {"type": "STRING", "description": "終点の市区町村名。分からなければ空"},
                     "approx_length_km": {"type": "NUMBER", "description": "この区間のおおよその距離 km（一般知識で可）。分からなければ 0"},
                     "via_labels": {"type": "ARRAY", "items": {"type": "STRING"}, "description": "経由地（峠、道の駅、展望台など）最大4つ"},
+                    "spots": {
+                        "type": "ARRAY",
+                        "description": "この道の途中・沿線で立ち寄った、または勧めている具体名のある場所。展望台・飲食店・道の駅・温泉など最大6つ",
+                        "items": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "name": {"type": "STRING", "description": "施設名・地点名（地図検索できる具体名）"},
+                                "kind": {"type": "STRING", "enum": ["viewpoint", "food", "rest", "pass", "onsen", "other"],
+                                         "description": "viewpoint=展望台・絶景地点, food=飲食店, rest=道の駅・売店・トイレ, pass=峠, onsen=温泉"},
+                                "municipality": {"type": "STRING", "description": "市区町村名。分からなければ空"},
+                                "note": {"type": "STRING", "description": "動画での言及内容を短く（例: 名物の鹿カレー、富士山が正面）"},
+                            },
+                            "required": ["name", "kind"],
+                        },
+                    },
                     "timestamp": {"type": "STRING", "description": "動画内でこの道が登場する時刻 mm:ss。不明なら空"},
                     "scenery_hint": {"type": "INTEGER", "description": "景色の良さの示唆 1-5"},
                     "winding_hint": {"type": "INTEGER", "description": "カーブの多さの示唆 1-5"},
