@@ -66,7 +66,12 @@ struct RoadDetailView: View {
             .task { videos = (try? await app.backend.videos(for: road.id)) ?? [] }
             .task {
                 // 動画から抽出したスポットを先に出し、Apple の地図データで展望台・道の駅を補う
-                let fromVideos = (try? await app.backend.spots(for: road.id)) ?? []
+                var fromVideos: [RoadSpot] = []
+                do { fromVideos = try await app.backend.spots(for: road.id) } catch {
+                    #if DEBUG
+                    print("spots の読み込みに失敗: \(error)")
+                    #endif
+                }
                 spots = fromVideos
                 let extra = await SpotFinder.nearby(road: road, excluding: fromVideos)
                 if !extra.isEmpty { spots = fromVideos + extra }
