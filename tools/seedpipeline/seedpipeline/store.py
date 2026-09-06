@@ -91,6 +91,11 @@ class Store:
                          ("spots", "text"), ("spots_status", "text default 'pending'")):
             if col not in cols:
                 self.db.execute(f"alter table roads add column {col} {typ}")
+        # spots 表も同様（写真の列は後から追加された）
+        scols = {r[1] for r in self.db.execute("pragma table_info(spots)")}
+        for col, typ in (("photo_url", "text"), ("photo_credit", "text"), ("photo_source", "text"), ("photo_status", "text default 'pending'")):
+            if col not in scols:
+                self.db.execute(f"alter table spots add column {col} {typ}")
         self.db.commit()
 
     # --- quota
