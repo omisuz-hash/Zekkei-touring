@@ -147,8 +147,10 @@ def cmd_seed():
         return
     latest = autos[-1]
     sql = open(latest, encoding="utf-8").read()
-    stmts = [s for s in split_statements(sql) if "insert into public.zekkei_roads" in s]
-    print(f"自動収集シード {os.path.basename(latest)}: {len(stmts)} 本を流し込みます")
+    stmts = [s for s in split_statements(sql) if "insert into public." in s]
+    n_roads = sum(1 for s in stmts if "insert into public.zekkei_roads" in s)
+    n_spots = sum(1 for s in stmts if "insert into public.road_spots" in s)
+    print(f"自動収集シード {os.path.basename(latest)}: 道 {n_roads} 本、スポット付きの道 {n_spots} 本を流し込みます")
     ok = ng = 0
     batch = 25
     for i in range(0, len(stmts), batch):
@@ -166,7 +168,7 @@ def cmd_seed():
                     m = re.search(r"values \('([^']+)'", s)
                     print(f"  NG   {m.group(1) if m else '?'}: {str(e2)[:120]}")
         print(f"  … {min(i + batch, len(stmts))}/{len(stmts)}", flush=True)
-    print(f"完了: 成功 {ok} 本 / 失敗 {ng} 本")
+    print(f"完了: 成功 {ok} 文 / 失敗 {ng} 文（道 1 本 = 1 文、スポットのある道はもう 1 文）")
 
 
 def cmd_stats():
@@ -174,6 +176,8 @@ def cmd_stats():
       (select count(*) from public.zekkei_roads) as roads,
       (select count(*) from public.zekkei_roads where source='seed_auto') as roads_auto,
       (select count(*) from public.road_videos) as videos,
+      (select count(*) from public.road_spots) as spots,
+      (select count(*) from public.road_spots where photo_url is not null) as spots_with_photo,
       (select count(*) from public.road_ratings) as ratings,
       (select count(*) from public.profiles) as users"""
     r = run_sql(q)[0]

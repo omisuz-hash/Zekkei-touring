@@ -196,18 +196,35 @@ class Pipeline:
 
     # 4d. 写真: スポットの代表写真を Wikimedia Commons から。無ければ紹介動画のサムネイル ----------
     def photos(self, limit: int | None = None) -> int:
-        from .photos import find_commons_photo
+        from .photos import find_commons_photo, find_wikipedia_image
         n = 0
         for sp in self.store.spots_pending_photo(limit or self.cfg.max_photos_per_run):
             url = credit = source = None
+            # 1) Commons: 地点の近くの写真。展望台・峠は山頂付近に写真が散らばるので広めに探す
             try:
-                hit = find_commons_photo(sp["lat"], sp["lng"], sp["name"])
+                hit = find_commons_photo(sp["lat"], sp["lng"], sp["name"], radius_m=1000 if sp["kind"] in ("viewpoint", "pass") else 500)
                 if hit:
                     url, credit, source = hit["url"], hit["credit"], "commons"
+            except HTTPError as e:
+                if e.status == 429:
+                    log("Wikimedia の呼び出し制限に達したため写真を中断します（次回に続きから再開）")
+                    break
+                log(f"写真 NG: {sp['name']} ({e})")
             except Exception as e:
                 log(f"写真 NG: {sp['name']} ({e})")
-            if not url and sp.get("video_id"):
-                url, credit, source = f"https://i.ytimg.com/vi/{sp['video_id']}/hqdefault.jpg", "YouTube", "youtube"
+            # 2) 日本語 Wikipedia の記事画像（峠・展望台・道の駅は記事があることが多い）
+            if not url:
+                try:
+                    hit = find_wikipedia_image(sp["name"], sp["lat"], sp["lng"])
+                    if hit:
+                        url, credit, source = hit["url"], hit["credit"], "wikipedia"
+                except Exception as e:
+                    log(f"写真 NG(wp): {sp['name']} ({e})")
+            # 3) スポットを紹介した動画、無ければ道の代表動画のサムネイル
+            if not url:
+                vid = sp.get("video_id") or ((self.store.road_videos(sp["road_id"]) or [{}])[0].get("video_id"))
+                if vid:
+                    url, credit, source = f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg", "YouTube", "youtube"
             self.store.save_photo(sp["road_id"], sp["name"], url, credit, source)
             if url:
                 n += 1

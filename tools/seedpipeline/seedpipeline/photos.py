@@ -5,12 +5,13 @@ import time
 from .http import request
 
 COMMONS = "https://commons.wikimedia.org/w/api.php"
+JAWIKI = "https://ja.wikipedia.org/w/api.php"
 UA = "zekkei-touring-seedpipeline/1.0 (https://github.com/omisuz-hash/zekkei-touring)"
 BAD_WORDS = ("map", "地図", "sign", "標識", "看板", "案内", "plan", "図", "logo", "icon", "diagram", ".svg", ".png", ".gif", "toilet", "トイレ", "menu", "メニュー")
 _last = 0.0
 
 
-def _pace(min_interval: float = 0.25):
+def _pace(min_interval: float = 0.5):
     global _last
     wait = _last + min_interval - time.time()
     if wait > 0:
@@ -26,6 +27,29 @@ def _tokens(name: str) -> list[str]:
 
 def _strip_html(s: str) -> str:
     return re.sub(r"<[^>]+>", "", s or "").strip()
+
+
+def find_wikipedia_image(name: str, lat: float, lng: float, max_dist_m: float = 3000) -> dict | None:
+    """日本語 Wikipedia でその名前の記事を探し、記事の代表画像を返す。記事に座標があれば地点から 3 km 以内のものだけ採用"""
+    _pace()
+    res = request(JAWIKI, params={"action": "query", "format": "json", "generator": "search", "gsrsearch": name, "gsrlimit": 3,
+                                  "prop": "pageimages|coordinates", "piprop": "thumbnail|name", "pithumbsize": 640},
+                  headers={"User-Agent": UA}, timeout=30)
+    toks = _tokens(name)
+    for p in sorted(res.get("query", {}).get("pages", {}).values(), key=lambda p: p.get("index", 99)):
+        title = p.get("title", "")
+        if not any(t in title for t in toks):
+            continue
+        thumb = (p.get("thumbnail") or {}).get("source")
+        if not thumb or any(w in thumb.lower() for w in BAD_WORDS):
+            continue
+        co = (p.get("coordinates") or [None])[0]
+        if co:
+            from .geo import haversine_m
+            if haversine_m((lng, lat), (co["lon"], co["lat"])) > max_dist_m:
+                continue
+        return {"url": thumb, "credit": "Wikipedia", "title": title}
+    return None
 
 
 def find_commons_photo(lat: float, lng: float, name: str, radius_m: int = 500) -> dict | None:
