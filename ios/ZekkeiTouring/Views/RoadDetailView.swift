@@ -14,6 +14,7 @@ struct RoadDetailView: View {
     @State private var showReport = false
     @State private var reportReason = ""
     @State private var showSignIn = false
+    @State private var showAddMedia = false
 
     private var unlocked: Bool { app.isUnlocked(road) }
 
@@ -49,6 +50,7 @@ struct RoadDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        Button { addMediaTapped() } label: { Label("写真・動画を追加", systemImage: "photo.badge.plus") }
                         Button(role: .destructive) { showReport = true } label: { Label("この道を通報", systemImage: "flag") }
                     } label: { Image(systemName: "ellipsis.circle").foregroundStyle(.white) }
                 }
@@ -60,6 +62,12 @@ struct RoadDetailView: View {
                 Button("キャンセル", role: .cancel) {}
             }
             .sheet(isPresented: $showSignIn) { SignInView() }
+            .sheet(isPresented: $showAddMedia) {
+                AddMediaView(road: road) { added in
+                    media = added + media
+                    Task { if let fresh = try? await app.backend.road(id: road.id) { road = fresh } }
+                }
+            }
             .sheet(item: $viewing) { m in
                 MediaViewer(media: m, url: app.backend.publicURL(bucket: m.bucket, path: m.storagePath))
             }
@@ -387,6 +395,11 @@ struct RoadDetailView: View {
     }
 
     /// Google マップに「この道に沿った経路」を渡す。Google マップのアプリが入っていれば自動でそちらが開き、そのままナビに使える
+    /// 写真・動画の追加。ログインは必要だが、走行記録は無くてよい
+    private func addMediaTapped() {
+        if app.isSignedIn { showAddMedia = true } else { showSignIn = true }
+    }
+
     private func openNavigation() {
         guard let url = road.googleMapsRouteURL else { return }
         UIApplication.shared.open(url)

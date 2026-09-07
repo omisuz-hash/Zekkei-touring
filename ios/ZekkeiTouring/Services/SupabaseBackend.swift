@@ -56,6 +56,12 @@ final class SupabaseBackend: Backend {
         return rows.first
     }
 
+    func setDisplayName(_ name: String) async throws -> String {
+        _ = try requireUser()
+        let v: String = try await client.rpc("set_display_name", params: ["p_name": name]).execute().value
+        return v
+    }
+
     private struct PrivacyUpdate: Encodable {
         let privacy_center: String?
         let privacy_radius_m: Int

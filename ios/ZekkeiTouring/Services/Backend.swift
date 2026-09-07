@@ -13,6 +13,8 @@ protocol Backend: AnyObject {
     func signOut() async throws
 
     func profile() async throws -> Profile?
+    /// ニックネームを変更する（2〜20 文字。URL やアカウント名は不可）
+    func setDisplayName(_ name: String) async throws -> String
     func updatePrivacyZone(center: CLLocationCoordinate2D?, radiusMeters: Int) async throws
 
     func nearbyRoads(center: CLLocationCoordinate2D, radiusMeters: Double, limit: Int) async throws -> [ZekkeiRoad]
@@ -90,9 +92,16 @@ final class MockBackend: Backend {
     func signInAsGuest() async throws { currentUserId = UUID() }
     func signOut() async throws { currentUserId = nil }
 
+    private var mockName = "ライダー0142"
+    private var mockNameSet = false
     func profile() async throws -> Profile? {
         guard let id = currentUserId else { return nil }
-        return Profile(id: id, displayName: "テストライダー", avatarUrl: nil, plan: .contributor)
+        return Profile(id: id, displayName: mockName, avatarUrl: nil, plan: .contributor, displayNameSet: mockNameSet)
+    }
+    func setDisplayName(_ name: String) async throws -> String {
+        mockName = name.trimmingCharacters(in: .whitespaces)
+        mockNameSet = true
+        return mockName
     }
     func updatePrivacyZone(center: CLLocationCoordinate2D?, radiusMeters: Int) async throws {}
 

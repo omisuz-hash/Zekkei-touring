@@ -2,6 +2,8 @@ import SwiftUI
 
 struct RootTabView: View {
     @EnvironmentObject private var app: AppState
+    @State private var showNickname = false
+    @AppStorage("nicknamePrompted") private var nicknamePrompted = false
 
     init() {
         // タブバー: 半透明ダーク（デザイン v2）
@@ -39,6 +41,14 @@ struct RootTabView: View {
         }
         .tint(.white)
         .preferredColorScheme(.dark)
+        .sheet(isPresented: $showNickname) { NicknameView() }
+        .onChange(of: app.profile?.needsNickname) { _, needs in
+            // ログイン直後に一度だけニックネームの設定を促す（「あとで」も選べる）
+            if needs == true, !nicknamePrompted {
+                nicknamePrompted = true
+                showNickname = true
+            }
+        }
         .alert("エラー", isPresented: Binding(get: { app.lastError != nil }, set: { if !$0 { app.lastError = nil } })) {
             Button("OK") { app.lastError = nil }
         } message: {

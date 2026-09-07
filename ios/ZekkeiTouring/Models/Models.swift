@@ -418,12 +418,17 @@ struct Profile: Codable, Identifiable {
     var displayName: String
     var avatarUrl: String?
     var plan: Plan
+    /// 本人がニックネームを決めたか（未設定なら自動割り当ての仮名）
+    var displayNameSet: Bool?
+
+    var needsNickname: Bool { displayNameSet != true }
 
     enum CodingKeys: String, CodingKey {
         case id
         case displayName = "display_name"
         case avatarUrl = "avatar_url"
         case plan
+        case displayNameSet = "display_name_set"
     }
 }
 

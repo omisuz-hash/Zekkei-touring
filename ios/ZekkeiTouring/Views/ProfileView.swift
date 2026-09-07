@@ -5,6 +5,7 @@ import CoreLocation
 struct ProfileView: View {
     @EnvironmentObject private var app: AppState
     @State private var showSignIn = false
+    @State private var showNickname = false
 
     var body: some View {
         NavigationStack {
@@ -35,6 +36,23 @@ struct ProfileView: View {
                             Image(systemName: "chevron.right").foregroundStyle(ZK.caption)
                         }
                         .padding(16).innerGroup(radius: 16)
+                    }
+                    if app.isSignedIn {
+                        Button { showNickname = true } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "person.text.rectangle").font(.system(size: 14)).foregroundStyle(ZK.accent)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("ニックネーム").font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+                                    Text(app.profile?.needsNickname == true ? "未設定（仮の名前で表示中）" : (app.profile?.displayName ?? ""))
+                                        .font(.system(size: 12)).foregroundStyle(app.profile?.needsNickname == true ? ZK.accent : ZK.caption)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right").foregroundStyle(ZK.caption)
+                            }
+                            .padding(14).innerGroup(radius: 14)
+                        }
+                        Text("投稿に表示されるのはニックネームだけです。本名やメールアドレスは公開されません。")
+                            .font(.system(size: 11)).foregroundStyle(ZK.caption)
                     }
                     if app.isUsingMock {
                         Text("接続先が未設定のため、テスト用データで動作しています。").font(.system(size: 11)).foregroundStyle(ZK.caption)
@@ -142,6 +160,7 @@ struct ProfileView: View {
             .background(ZK.bg)
             .navigationBarHidden(true)
             .sheet(isPresented: $showSignIn) { SignInView() }
+            .sheet(isPresented: $showNickname) { NicknameView() }
             .refreshable { await app.refreshAccount() }
         }
         .preferredColorScheme(.dark)

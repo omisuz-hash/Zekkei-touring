@@ -46,6 +46,19 @@ final class AppState: ObservableObject {
         await refreshAccount()
     }
 
+    /// ニックネームを変更する。成功したら true
+    func updateNickname(_ name: String) async -> Bool {
+        do {
+            let v = try await backend.setDisplayName(name)
+            profile?.displayName = v
+            profile?.displayNameSet = true
+            return true
+        } catch {
+            lastError = error.localizedDescription
+            return false
+        }
+    }
+
     func refreshAccount() async {
         isSignedIn = backend.currentUserId != nil
         guard isSignedIn else {
