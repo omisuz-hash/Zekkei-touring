@@ -90,6 +90,10 @@ def cmd_check():
 
 def ensure_migrations_table():
     run_sql("create table if not exists public.schema_migrations (name text primary key, applied_at timestamptz not null default now())")
+    # 適用履歴は運用者だけが読み書きする表。アプリの鍵からは触れないように閉じる
+    # （行レベルの保護を有効にし、方針を 1 つも置かない = 一般の鍵からは 0 件に見える）
+    run_sql("alter table public.schema_migrations enable row level security")
+    run_sql("revoke all on public.schema_migrations from anon, authenticated")
 
 
 def cmd_migrate():
