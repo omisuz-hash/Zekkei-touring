@@ -38,6 +38,9 @@ if [[ -f "$HOME/.zekkei_supabase" ]]; then
   # shellcheck disable=SC1090
   source "$HOME/.zekkei_supabase"
   (cd "$REPO/tools/supabase" && python3 20260905_db_admin.py seed && python3 20260905_db_admin.py stats) || echo "Supabase への流し込みに失敗しました"
+  # 無料枠の自動停止対策: 管理 API 経由の書き込みは「利用実績」に数えられないため、
+  # アプリと同じ経路（REST API）でも 1 回読んでおく
+  (cd "$REPO/tools/supabase" && python3 20260905_db_admin.py ping) || echo "REST API への疎通に失敗しました"
 fi
 echo "== $(date '+%Y-%m-%d %H:%M') 終了 (exit $STATUS) =="
 exit $STATUS

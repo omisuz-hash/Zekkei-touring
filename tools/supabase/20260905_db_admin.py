@@ -5,6 +5,7 @@
   python3 20260905_db_admin.py migrate   supabase/migrations/*.sql を日付順に適用（適用済みは飛ばす）
   python3 20260905_db_admin.py seed      手作業シードと自動収集シード（最新の *_seed_roads_auto.sql）を流し込む
   python3 20260905_db_admin.py stats     道・動画・会員の件数
+  python3 20260905_db_admin.py ping      アプリと同じ経路（REST API）で 1 回読む。無料枠の自動停止（7 日間無通信）を避けるため
   python3 20260905_db_admin.py sql "select count(*) from zekkei_roads"   任意の SQL（管理用）
 
 接続情報は ~/.zekkei_supabase（20260905_setup_supabase.sh で作成）から読む。
@@ -190,6 +191,21 @@ def cmd_stats():
         print(f"{k}: {v}")
 
 
+def cmd_ping():
+    """アプリと同じ経路（REST API + アプリ用の鍵）で軽く読む。
+    管理 API 経由の書き込みは Supabase の「利用実績」に数えられないため、無料枠では
+    これが無いと 7 日間無通信と判定され、プロジェクトが自動停止される。"""
+    url = f"{env('SUPABASE_URL')}/rest/v1/zekkei_roads?select=id&limit=1"
+    key = env("SUPABASE_PUBLISHABLE_KEY")
+    try:
+        api("GET", url, headers={"apikey": key, "Authorization": f"Bearer {key}"})
+        print("OK   REST API に到達しました（利用実績として記録されます）")
+        return True
+    except Exception as e:
+        print(f"NG   REST API に到達できません: {e}")
+        return False
+
+
 def main():
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
         print(__doc__); return
@@ -202,6 +218,8 @@ def main():
         cmd_seed()
     elif cmd == "stats":
         cmd_stats()
+    elif cmd == "ping":
+        sys.exit(0 if cmd_ping() else 1)
     elif cmd == "sql":
         print(json.dumps(run_sql(sys.argv[2]), ensure_ascii=False, indent=2))
     else:
