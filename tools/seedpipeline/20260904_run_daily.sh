@@ -40,7 +40,14 @@ if [[ -f "$HOME/.zekkei_supabase" ]]; then
   (cd "$REPO/tools/supabase" && python3 20260905_db_admin.py seed && python3 20260905_db_admin.py stats) || echo "Supabase への流し込みに失敗しました"
   # 無料枠の自動停止対策: 管理 API 経由の書き込みは「利用実績」に数えられないため、
   # アプリと同じ経路（REST API）でも 1 回読んでおく
-  (cd "$REPO/tools/supabase" && python3 20260905_db_admin.py ping) || echo "REST API への疎通に失敗しました"
+  if ! (cd "$REPO/tools/supabase" && python3 20260905_db_admin.py ping); then
+    echo "!! 重要: Supabase に到達できません。プロジェクトが一時停止されている可能性があります。"
+    echo "!! 管理画面 https://supabase.com/dashboard/project/pyeepidpoajdoslpwqlk から再開してください。"
+    # 毎朝の確認で気づけるよう、レポートの先頭にも残す
+    for f in out/*_seed_report.md; do
+      [[ -f "$f" ]] && printf '%s\n\n%s' "> **注意: $(date '+%Y-%m-%d') 時点で Supabase に到達できませんでした（一時停止の可能性）。データベースへの流し込みは行われていません。**" "$(cat "$f")" > "$f"
+    done
+  fi
 fi
 echo "== $(date '+%Y-%m-%d %H:%M') 終了 (exit $STATUS) =="
 exit $STATUS
