@@ -210,6 +210,17 @@ def main():
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
         print(__doc__); return
     cmd = sys.argv[1]
+    try:
+        run(cmd)
+    except RuntimeError as e:
+        if str(e).startswith("HTTP 401"):
+            sys.exit("管理用トークン（Personal Access Token）が無効です。失効したか、取り消された可能性があります。\n"
+                     "対処: https://supabase.com/dashboard/account/tokens で新しく作成し、次を実行してください。\n"
+                     "  ./20260905_setup_supabase.sh --token-only")
+        sys.exit(f"失敗しました: {e}")
+
+
+def run(cmd: str):
     if cmd == "check":
         sys.exit(0 if cmd_check() else 1)
     elif cmd == "migrate":

@@ -15,6 +15,25 @@ ask() {  # 空のまま Enter を押したら聞き直す
   done
   printf 'export %s=%q\n' "${var}" "${val}" >> "$TMP"
 }
+# --token-only: 既存の設定はそのままに、Personal Access Token だけ入れ直す
+if [[ "${1:-}" == "--token-only" ]]; then
+  [[ -f "$KEYFILE" ]] || { echo "既存の設定 $KEYFILE がありません。引数なしで実行して全項目を登録してください。"; exit 1; }
+  echo "絶景道: Personal Access Token の入れ直し（他の項目は変更しません）"
+  grep -v '^export SUPABASE_ACCESS_TOKEN=' "$KEYFILE" > "$TMP"
+  ask SUPABASE_ACCESS_TOKEN "新しい Personal Access Token（sbp_...  https://supabase.com/dashboard/account/tokens で作成）"
+  chmod 600 "$TMP"
+  echo "検証中…"
+  if ( set -a; source "$TMP"; set +a; python3 20260905_db_admin.py check ); then
+    cp -p "$KEYFILE" "$KEYFILE.bak.$(date +%Y%m%d%H%M%S)"
+    mv "$TMP" "$KEYFILE"; trap - EXIT
+    echo "保存しました: $KEYFILE（元の内容は .bak.* に残しています）"
+    echo "同じ端末の窓で続ける場合は  source ~/.zekkei_supabase  を実行してください。"
+    exit 0
+  else
+    echo "検証に失敗したため保存しませんでした。元の設定はそのままです。"; exit 1
+  fi
+fi
+
 echo "絶景道: Supabase 接続情報の登録"
 url=""
 while [[ -z "${url}" ]]; do
