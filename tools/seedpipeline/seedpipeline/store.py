@@ -410,6 +410,9 @@ class Store:
             "select count(*) from videos where status in ('extracted','video_analyzed') and coalesce(spots_done,0)=0").fetchone()[0]
         s["roads_wiki_pending"] = self.db.execute("select count(*) from roads where geo_status='ok' and coalesce(wiki_status,'pending')='pending'").fetchone()[0]
         s["spots_with_photo"] = self.db.execute("select count(*) from spots where photo_url is not null").fetchone()[0]
+        # 動画サムネイルの代用（現地写真ではない）を除いた、本当に現地の写真が見つかった件数
+        s["spots_with_real_photo"] = self.db.execute(
+            "select count(*) from spots where photo_source in ('commons', 'wikipedia')").fetchone()[0]
         s["spots_photo_pending"] = self.db.execute("select count(*) from spots where coalesce(photo_status,'pending')='pending'").fetchone()[0]
         s["roads_spots_pending"] = self.db.execute("select count(*) from roads where geo_status='ok' and coalesce(spots_status,'pending')='pending'").fetchone()[0]
         s["channels"] = self.db.execute("select count(*) from channels").fetchone()[0]
