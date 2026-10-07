@@ -156,6 +156,24 @@ struct ZekkeiRoad: Codable, Identifiable, Hashable {
     }
     /// 動画から自動抽出された道か（ユーザーの実走ではない）
     var isFromVideos: Bool { source == "seed_auto" || (isSeed && youtubeUrl != nil) }
+
+    /// 代表動画の ID（youtube_url から取り出す）
+    var youtubeVideoId: String? {
+        guard let u = youtubeUrl, let c = URLComponents(string: u) else { return nil }
+        if let v = c.queryItems?.first(where: { $0.name == "v" })?.value, !v.isEmpty { return v }
+        if c.host?.contains("youtu.be") == true {
+            let id = c.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            return id.isEmpty ? nil : id
+        }
+        return nil
+    }
+
+    /// 地図上のタグに出す小さな代表画像。投稿写真があればそれ、無ければ代表動画のサムネイル
+    /// （投稿写真は保管庫の URL が要るので、ここでは動画のサムネイルのみ扱う）
+    var tagThumbnailURL: URL? {
+        guard let id = youtubeVideoId else { return nil }
+        return URL(string: "https://i.ytimg.com/vi/\(id)/mqdefault.jpg")
+    }
     var geometryNote: String? {
         switch geometryQuality {
         case "routed": return "位置は地図経路による推定です。実走の投稿で補正されます"

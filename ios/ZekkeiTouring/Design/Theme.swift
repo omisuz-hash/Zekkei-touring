@@ -149,12 +149,28 @@ struct CodeTag: View {
     var muted: Bool = false
     /// 0 = 控えめ、1 = 標準、2 = 強調
     var level: Int = 1
+    /// 強調段階（絶景度 4.5 以上）のときだけ、アイコンの位置に出す代表画像
+    var thumbnail: URL? = nil
     var body: some View {
         let size: CGFloat = level >= 2 ? 13 : (level == 1 ? 10.5 : 9)
         let weight: Font.Weight = level >= 2 ? .heavy : (level == 1 ? .bold : .medium)
         let border = muted ? ZK.tier3 : (level >= 2 ? ZK.highlight : ZK.accent)
-        HStack(spacing: 4) {
-            Image(systemName: fromVideo ? "play.fill" : "star.fill").font(.system(size: size * 0.75, weight: .bold))
+        HStack(spacing: 5) {
+            if level >= 2, let url = thumbnail {
+                AsyncImage(url: url) { phase in
+                    if case .success(let img) = phase {
+                        img.resizable().scaledToFill()
+                    } else {
+                        Image(systemName: "photo").font(.system(size: size * 0.6)).foregroundStyle(ZK.caption)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity).background(Color.black.opacity(0.4))
+                    }
+                }
+                .frame(width: size * 1.55, height: size * 1.55).clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).stroke(.white.opacity(0.35), lineWidth: 0.6))
+            } else {
+                Image(systemName: fromVideo ? "play.fill" : "star.fill").font(.system(size: size * 0.75, weight: .bold))
+            }
             Text(code).font(.system(size: size, weight: weight)).tracking(0.4)
         }
         .foregroundStyle(muted ? ZK.caption : (level >= 2 ? ZK.highlight : .white))

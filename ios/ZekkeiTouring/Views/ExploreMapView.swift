@@ -47,7 +47,8 @@ struct ExploreMapView: View {
                 ForEach(taggedRoads) { road in
                     if let start = road.coordinates.first {
                         Annotation(road.name, coordinate: start, anchor: .bottomLeading) {
-                            CodeTag(code: road.shortCode, fromVideo: road.isFromVideos, muted: road.displayScenery == nil, level: road.tagLevel)
+                            CodeTag(code: road.shortCode, fromVideo: road.isFromVideos, muted: road.displayScenery == nil,
+                                    level: road.tagLevel, thumbnail: road.tagThumbnailURL)
                                 .onTapGesture { selected = road }
                         }
                         .tag(road)
