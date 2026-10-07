@@ -66,6 +66,7 @@ final class AppState: ObservableObject {
             let rides = try TrackImporter.rides(from: url)
             rides.forEach { store.save($0) }
             lastNotice = "\(rides.count) 件の走行記録を取り込みました。「走行記録」タブから区間を切り出せます。"
+                + (privacyCenter == nil ? "\n\n取り込んだ記録には自宅の出発・到着が含まれている場合があります。「走行記録」タブの案内から、自宅の周辺を伏せる設定ができます。" : "")
         } catch {
             lastError = error.localizedDescription
         }

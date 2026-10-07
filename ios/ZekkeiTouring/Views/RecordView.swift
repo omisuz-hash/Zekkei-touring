@@ -119,6 +119,9 @@ struct RidesListView: View {
     @EnvironmentObject private var app: AppState
     @State private var showImporter = false
     @State private var importMessage: String?
+    @State private var showPrivacy = false
+    /// 取り込み後に、未設定なら続けて設定を促す
+    @State private var suggestPrivacyAfterImport = false
 
     var body: some View {
         NavigationStack {
@@ -134,6 +137,11 @@ struct RidesListView: View {
                             .font(.system(size: 11)).foregroundStyle(ZK.caption)
                     }
                     .listRowBackground(Color.clear).listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 8, trailing: 16))
+                }
+                if app.privacyCenter == nil {
+                    PrivacyZoneNotice { showPrivacy = true }
+                        .listRowBackground(Color.clear).listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
                 }
                 Section {
                     Button { showImporter = true } label: {
@@ -178,8 +186,14 @@ struct RidesListView: View {
                           allowsMultipleSelection: true) { result in
                 importFiles(result)
             }
+            .sheet(isPresented: $showPrivacy) { PrivacyZoneSheet() }
             .alert("取り込み", isPresented: Binding(get: { importMessage != nil }, set: { if !$0 { importMessage = nil } })) {
-                Button("OK") { importMessage = nil }
+                if suggestPrivacyAfterImport {
+                    Button("自宅の周辺を伏せる") { importMessage = nil; suggestPrivacyAfterImport = false; showPrivacy = true }
+                    Button("あとで", role: .cancel) { importMessage = nil; suggestPrivacyAfterImport = false }
+                } else {
+                    Button("OK") { importMessage = nil }
+                }
             } message: { Text(importMessage ?? "") }
         }
         .preferredColorScheme(.dark)
@@ -204,7 +218,10 @@ struct RidesListView: View {
                 }
             }
             if added > 0 {
+                // 他アプリの記録には自宅の出発・到着が含まれることが多い。未設定なら続けて案内する
+                suggestPrivacyAfterImport = app.privacyCenter == nil
                 importMessage = "\(added) 件の走行記録を取り込みました。一覧から選んで区間を切り出せます。"
+                    + (suggestPrivacyAfterImport ? "\n\n取り込んだ記録には自宅の出発・到着が含まれている場合があります。自宅の周辺を伏せる設定をしておくと、切り出し時に自動で除かれます。" : "")
                     + (errors.isEmpty ? "" : "\n\n読み込めなかったファイル:\n" + errors.joined(separator: "\n"))
             } else {
                 importMessage = errors.isEmpty ? "取り込めるものがありませんでした。" : errors.joined(separator: "\n")

@@ -98,50 +98,7 @@ struct ProfileView: View {
                     }
                     .innerGroup(radius: 16)
 
-                    // プライバシーゾーン
-                    CaptionLabel(text: "プライバシーゾーン", size: 10)
-                    VStack(spacing: 0) {
-                        HStack {
-                            Text("中心").font(.system(size: 15)).foregroundStyle(.white)
-                            Spacer()
-                            Text(app.privacyCenter == nil ? "未設定" : "自宅（設定済み）").font(.system(size: 15)).foregroundStyle(ZK.caption)
-                        }
-                        .padding(16)
-                        Divider().overlay(ZK.divider)
-                        VStack(spacing: 8) {
-                            HStack {
-                                Text("半径").font(.system(size: 15)).foregroundStyle(.white)
-                                Spacer()
-                                Text("\(Int(app.privacyRadiusMeters).formatted()) m").font(.zkNumber(15)).foregroundStyle(ZK.highlight)
-                            }
-                            Slider(value: $app.privacyRadiusMeters, in: 300...3000, step: 100).tint(.white)
-                            HStack {
-                                Text("300 m").font(.system(size: 11)).foregroundStyle(ZK.caption)
-                                Spacer()
-                                Text("3,000 m").font(.system(size: 11)).foregroundStyle(ZK.caption)
-                            }
-                        }
-                        .padding(16)
-                        Divider().overlay(ZK.divider)
-                        HStack {
-                            Button("現在地を中心に設定") {
-                                if let l = app.recorder.lastLocation?.coordinate {
-                                    app.privacyCenter = l
-                                } else {
-                                    app.recorder.requestPermission()
-                                    app.lastError = "現在地をまだ取得できていません。少し待ってからもう一度お試しください。"
-                                }
-                            }
-                            .font(.system(size: 15, weight: .bold)).foregroundStyle(ZK.accent)
-                            Spacer()
-                            if app.privacyCenter != nil {
-                                Button("解除") { app.privacyCenter = nil }.font(.system(size: 13)).foregroundStyle(ZK.errorText)
-                            }
-                        }
-                        .padding(16)
-                    }
-                    .innerGroup(radius: 16)
-                    Text("この範囲内の走行軌跡は、切り出し時に自動で除外されます").font(.system(size: 12)).foregroundStyle(ZK.caption)
+                    PrivacyZoneCard()
 
                     // サポート（Apple 審査 1.2: 連絡先の公開、通報の説明）
                     CaptionLabel(text: "サポート", size: 10)
