@@ -17,6 +17,15 @@ final class AppState: ObservableObject {
 
     private var cancellables: Set<AnyCancellable> = []
 
+    /// 初期表示の地域。端末内に保存する（ログイン不要で使えるようにするため）
+    @Published var homeRegion: Region = .kanto {
+        didSet { UserDefaults.standard.set(homeRegion.rawValue, forKey: "home.region") }
+    }
+    /// 一度でも地域を選んだか（初回だけ選択を促す）
+    @Published var homeRegionChosen = false {
+        didSet { UserDefaults.standard.set(homeRegionChosen, forKey: "home.regionChosen") }
+    }
+
     /// プライバシーゾーン（自宅など）。端末内に保存し、切り出し時の既定除外に使う
     @Published var privacyCenter: CLLocationCoordinate2D? {
         didSet { persistPrivacy() }
@@ -36,9 +45,17 @@ final class AppState: ObservableObject {
         }
         let r = d.double(forKey: "privacy.radius")
         if r > 0 { privacyRadiusMeters = r }
+        if let raw = d.string(forKey: "home.region"), let reg = Region(rawValue: raw) { homeRegion = reg }
+        homeRegionChosen = d.bool(forKey: "home.regionChosen")
         // 記録・保存の変化を画面に伝える（入れ子の ObservableObject は自動では伝わらない）
         recorder.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &cancellables)
         store.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &cancellables)
+    }
+
+    /// 地域を未設定のまま現在地が取れた場合、一番近い地域を初期値にする（確定ではなく既定値）
+    func suggestRegionFromLocation() {
+        guard !homeRegionChosen, let l = recorder.lastLocation else { return }
+        homeRegion = Region.nearest(to: l.coordinate)
     }
 
     func bootstrap() async {

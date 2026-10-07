@@ -6,6 +6,7 @@ struct ProfileView: View {
     @EnvironmentObject private var app: AppState
     @State private var showSignIn = false
     @State private var showNickname = false
+    @State private var showRegion = false
 
     var body: some View {
         NavigationStack {
@@ -53,6 +54,18 @@ struct ProfileView: View {
                         }
                         Text("投稿に表示されるのはニックネームだけです。本名やメールアドレスは公開されません。")
                             .font(.system(size: 11)).foregroundStyle(ZK.caption)
+                    }
+                    Button { showRegion = true } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "map").font(.system(size: 14)).foregroundStyle(ZK.accent)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("よく走る地域").font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+                                Text("\(app.homeRegion.name)（アプリを開いたときの表示）").font(.system(size: 12)).foregroundStyle(ZK.caption)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").foregroundStyle(ZK.caption)
+                        }
+                        .padding(14).innerGroup(radius: 14)
                     }
                     if app.isUsingMock {
                         Text("接続先が未設定のため、テスト用データで動作しています。").font(.system(size: 11)).foregroundStyle(ZK.caption)
@@ -161,6 +174,7 @@ struct ProfileView: View {
             .navigationBarHidden(true)
             .sheet(isPresented: $showSignIn) { SignInView() }
             .sheet(isPresented: $showNickname) { NicknameView() }
+            .sheet(isPresented: $showRegion) { RegionPickerView() }
             .refreshable { await app.refreshAccount() }
         }
         .preferredColorScheme(.dark)

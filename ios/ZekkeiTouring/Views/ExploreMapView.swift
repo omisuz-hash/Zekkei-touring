@@ -4,9 +4,11 @@ import MapKit
 /// 探す: 衛星調ダーク地図に絶景道を重ねる
 struct ExploreMapView: View {
     @EnvironmentObject private var app: AppState
-    @State private var position: MapCameraPosition = .region(
-        MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 36.2, longitude: 138.5),
-                           span: MKCoordinateSpan(latitudeDelta: 1.5, longitudeDelta: 1.5)))
+    /// 初期位置は既定の地域。表示後は地図の移動に従う
+    @State private var position: MapCameraPosition = .region(Region.stored.mapRegion)
+    @State private var showRegionPicker = false
+    /// 最初の 1 回は「その地域の代表的な 30 本」だけを出す（初見で見やすくするため）
+    @State private var isFirstLoad = true
     @State private var roads: [ZekkeiRoad] = []
     /// 地図側の選択（ホバーや再読込で変わりうる）
     @State private var mapSelection: ZekkeiRoad?
@@ -18,6 +20,7 @@ struct ExploreMapView: View {
     @State private var currentRegion: MKCoordinateRegion?
     @State private var query = ""
     @State private var spanLat: Double = 1.5
+    @State private var didSetInitialRegion = false
     @FocusState private var searchFocused: Bool
 
     /// 全部の道にタグを出す。目立つ道ほど後に描いて、重なったときに上に来るようにする
@@ -83,7 +86,10 @@ struct ExploreMapView: View {
             VStack {
                 Spacer()
                 HStack(alignment: .bottom) {
-                    legend
+                    VStack(alignment: .leading, spacing: 8) {
+                        regionChip
+                        legend
+                    }
                     Spacer()
                     VStack(spacing: 0) {
                         Button { zoom(by: 0.5) } label: {
@@ -119,7 +125,44 @@ struct ExploreMapView: View {
                 .presentationBackground(Color(hex: 0x14181C).opacity(0.96))
                 .presentationDragIndicator(.visible)
         }
-        .onAppear { app.recorder.requestPermission() }
+        .onAppear {
+            app.recorder.requestPermission()
+            // 保存値と食い違う場合だけ合わせる（通常は初期値のまま）
+            if !didSetInitialRegion {
+                didSetInitialRegion = true
+                if app.homeRegion != Region.stored { position = .region(app.homeRegion.mapRegion) }
+            }
+        }
+        .sheet(isPresented: $showRegionPicker, onDismiss: { resetToHomeRegion() }) {
+            RegionPickerView(isOnboarding: !app.homeRegionChosen)
+                .interactiveDismissDisabled(!app.homeRegionChosen)
+        }
+        .task {
+            // 初回起動時は地域の選択を促す（現在地が取れていれば近い地域を初期値に）
+            if !app.homeRegionChosen { showRegionPicker = true }
+        }
+    }
+
+    /// 地域を選び直したら、その地域の代表的な 30 本に戻す
+    private func resetToHomeRegion() {
+        isFirstLoad = true
+        lastCenter = nil
+        lastSpanLat = 0
+        withAnimation(.easeInOut(duration: 0.35)) { position = .region(app.homeRegion.mapRegion) }
+    }
+
+    /// 既定の地域を示すボタン。タップで変更できる
+    private var regionChip: some View {
+        Button { showRegionPicker = true } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "mappin.and.ellipse").font(.system(size: 11, weight: .semibold))
+                Text(app.homeRegion.name).font(.system(size: 12, weight: .bold))
+                if isFirstLoad { Text("代表の道").font(.system(size: 10)).foregroundStyle(ZK.caption) }
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12).frame(height: 34)
+            .glassPill(radius: 999)
+        }
     }
 
     private func lineWidth(_ road: ZekkeiRoad) -> CGFloat {
@@ -182,11 +225,17 @@ struct ExploreMapView: View {
         defer { isLoading = false }
         // 画面の対角線の半分ほどを取得半径に。上限は日本全体が入る 1,200 km
         let radius = max(15_000, min(1_200_000, span.latitudeDelta * 111_000 * 0.9))
-        // 引いて見ているときは目立つ道だけに絞る。日本全体（ズーム 5 相当）で 150 本、
-        // 拡大するほど 2 次曲線で増やし、10 段階（ズーム 15）で 1,500 本
-        let zoom = log2(360 / max(span.longitudeDelta, 0.0001))
-        let t = min(1, max(0, (zoom - 5) / 10))
-        let limit = Int(150 + 1350 * t * t)
+        // 初回は既定の地域の代表的な 30 本だけ。以降は縮尺に応じて増やす
+        // （日本全体＝ズーム 5 相当で 150 本、拡大するほど 2 次曲線で増やし、10 段階で 1,500 本）
+        let limit: Int
+        if isFirstLoad {
+            limit = 30
+            isFirstLoad = false
+        } else {
+            let zoom = log2(360 / max(span.longitudeDelta, 0.0001))
+            let t = min(1, max(0, (zoom - 5) / 10))
+            limit = Int(150 + 1350 * t * t)
+        }
         do {
             roads = try await app.backend.nearbyRoads(center: center, radiusMeters: radius, limit: limit)
         } catch {
