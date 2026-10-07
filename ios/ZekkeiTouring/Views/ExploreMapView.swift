@@ -143,6 +143,20 @@ struct ExploreMapView: View {
         }
     }
 
+    /// 縮尺ごとの表示本数。画面に出るタグの密度がほぼ一定になるように決めている。
+    /// 引いているときは本数を抑え、拡大するほど細い道まで見せる
+    static func roadLimit(forSpanDegrees span: Double) -> Int {
+        switch span {
+        case 3.0...:      return 60      // 日本全体〜広域
+        case 1.5..<3.0:   return 70      // 地方（既定の表示）
+        case 0.8..<1.5:   return 120     // 県をまたぐ範囲
+        case 0.4..<0.8:   return 220     // 県の一部
+        case 0.2..<0.4:   return 400
+        case 0.1..<0.2:   return 650
+        default:          return 1000    // 市街地まで寄せた範囲
+        }
+    }
+
     /// 地域を選び直したら、その地域の代表的な 30 本に戻す
     private func resetToHomeRegion() {
         isFirstLoad = true
@@ -225,16 +239,13 @@ struct ExploreMapView: View {
         defer { isLoading = false }
         // 画面の対角線の半分ほどを取得半径に。上限は日本全体が入る 1,200 km
         let radius = max(15_000, min(1_200_000, span.latitudeDelta * 111_000 * 0.9))
-        // 初回は既定の地域の代表的な 30 本だけ。以降は縮尺に応じて増やす
-        // （日本全体＝ズーム 5 相当で 150 本、拡大するほど 2 次曲線で増やし、10 段階で 1,500 本）
+        // 初回は既定の地域の代表的な 30 本だけ。以降は縮尺に応じた本数
         let limit: Int
         if isFirstLoad {
             limit = 30
             isFirstLoad = false
         } else {
-            let zoom = log2(360 / max(span.longitudeDelta, 0.0001))
-            let t = min(1, max(0, (zoom - 5) / 10))
-            limit = Int(150 + 1350 * t * t)
+            limit = Self.roadLimit(forSpanDegrees: span.latitudeDelta)
         }
         do {
             roads = try await app.backend.nearbyRoads(center: center, radiusMeters: radius, limit: limit)
