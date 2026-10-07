@@ -14,6 +14,8 @@ final class AppState: ObservableObject {
     @Published var creditBalance = 0
     @Published var unlockedRoadIds: Set<UUID> = []
     @Published var lastError: String?
+    /// 取り込み結果の知らせ（他アプリから共有されたときに出す）
+    @Published var lastNotice: String?
 
     private var cancellables: Set<AnyCancellable> = []
 
@@ -56,6 +58,17 @@ final class AppState: ObservableObject {
     func suggestRegionFromLocation() {
         guard !homeRegionChosen, let l = recorder.lastLocation else { return }
         homeRegion = Region.nearest(to: l.coordinate)
+    }
+
+    /// 他のアプリから共有された走行記録のファイルを取り込む
+    func importTrackFile(_ url: URL) {
+        do {
+            let rides = try TrackImporter.rides(from: url)
+            rides.forEach { store.save($0) }
+            lastNotice = "\(rides.count) 件の走行記録を取り込みました。「走行記録」タブから区間を切り出せます。"
+        } catch {
+            lastError = error.localizedDescription
+        }
     }
 
     func bootstrap() async {

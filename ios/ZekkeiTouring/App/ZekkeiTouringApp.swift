@@ -17,7 +17,11 @@ struct ZekkeiTouringApp: App {
                 .environmentObject(app)
                 .task { await app.bootstrap() }
                 .onOpenURL { url in
-                    GIDSignIn.sharedInstance.handle(url)
+                    if url.isFileURL {
+                        app.importTrackFile(url)
+                    } else {
+                        GIDSignIn.sharedInstance.handle(url)
+                    }
                 }
         }
     }

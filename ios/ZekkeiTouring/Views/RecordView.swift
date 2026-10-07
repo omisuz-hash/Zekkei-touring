@@ -117,6 +117,8 @@ struct RecordView: View {
 /// 走行記録一覧
 struct RidesListView: View {
     @EnvironmentObject private var app: AppState
+    @State private var showImporter = false
+    @State private var importMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -133,8 +135,25 @@ struct RidesListView: View {
                     }
                     .listRowBackground(Color.clear).listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 8, trailing: 16))
                 }
+                Section {
+                    Button { showImporter = true } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "square.and.arrow.down").font(.system(size: 15)).foregroundStyle(ZK.accent)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("他のアプリの記録を取り込む").font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+                                Text("GPX / KML / TCX ファイル（ナビや記録アプリから書き出したもの）")
+                                    .font(.system(size: 11)).foregroundStyle(ZK.caption)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").foregroundStyle(ZK.caption)
+                        }
+                        .padding(14).innerGroup(radius: 14)
+                    }
+                    .listRowBackground(Color.clear).listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 8, trailing: 12))
+                }
                 if app.store.rides.isEmpty {
-                    Text("走行記録はまだありません。「記録」タブから走行を記録すると、ここから絶景道を切り出せます。")
+                    Text("走行記録はまだありません。「記録」タブで走行を記録するか、上から他のアプリの記録を取り込むと、ここから絶景道を切り出せます。")
                         .font(.system(size: 13)).foregroundStyle(ZK.caption).listRowBackground(Color.clear)
                 }
                 ForEach(app.store.rides) { ride in
@@ -154,8 +173,43 @@ struct RidesListView: View {
             .background(ZK.bg)
             .navigationBarHidden(true)
             .navigationDestination(for: RideLog.self) { ride in TrimView(ride: ride) }
+            .fileImporter(isPresented: $showImporter,
+                          allowedContentTypes: TrackFileTypes.all,
+                          allowsMultipleSelection: true) { result in
+                importFiles(result)
+            }
+            .alert("取り込み", isPresented: Binding(get: { importMessage != nil }, set: { if !$0 { importMessage = nil } })) {
+                Button("OK") { importMessage = nil }
+            } message: { Text(importMessage ?? "") }
         }
         .preferredColorScheme(.dark)
+    }
+
+    /// 選ばれたファイルを読み込み、走行記録として保存する
+    private func importFiles(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure(let e):
+            importMessage = e.localizedDescription
+        case .success(let urls):
+            var added = 0
+            var errors: [String] = []
+            for url in urls {
+                do {
+                    for ride in try TrackImporter.rides(from: url) {
+                        app.store.save(ride)
+                        added += 1
+                    }
+                } catch {
+                    errors.append("\(url.lastPathComponent): \(error.localizedDescription)")
+                }
+            }
+            if added > 0 {
+                importMessage = "\(added) 件の走行記録を取り込みました。一覧から選んで区間を切り出せます。"
+                    + (errors.isEmpty ? "" : "\n\n読み込めなかったファイル:\n" + errors.joined(separator: "\n"))
+            } else {
+                importMessage = errors.isEmpty ? "取り込めるものがありませんでした。" : errors.joined(separator: "\n")
+            }
+        }
     }
 }
 

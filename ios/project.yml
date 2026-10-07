@@ -40,6 +40,24 @@ targets:
         NSPhotoLibraryUsageDescription: 絶景道の写真を投稿するために写真ライブラリへアクセスします。
         NSCameraUsageDescription: 絶景道の写真を撮影して投稿するためにカメラを使用します。
         UIBackgroundModes: [location]
+        # 他のアプリから GPX / TCX / KML を受け取れるようにする（共有シートに「絶景道」が出る）
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: com.topografix.gpx
+            UTTypeDescription: GPX 走行記録
+            UTTypeConformsTo: [public.xml]
+            UTTypeTagSpecification:
+              public.filename-extension: [gpx]
+              public.mime-type: [application/gpx+xml]
+          - UTTypeIdentifier: com.garmin.tcx
+            UTTypeDescription: TCX 走行記録
+            UTTypeConformsTo: [public.xml]
+            UTTypeTagSpecification:
+              public.filename-extension: [tcx]
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: 走行記録
+            LSHandlerRank: Alternate
+            CFBundleTypeRole: Viewer
+            LSItemContentTypes: [com.topografix.gpx, com.garmin.tcx, com.google.earth.kml]
         # Google ログインのコールバック用 URL スキーム（Local.xcconfig の GOOGLE_REVERSED_CLIENT_ID）
         CFBundleURLTypes:
           - CFBundleURLSchemes: [$(GOOGLE_REVERSED_CLIENT_ID)]

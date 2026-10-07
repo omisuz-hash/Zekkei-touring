@@ -54,6 +54,11 @@ struct RootTabView: View {
         } message: {
             Text(app.lastError ?? "")
         }
+        .alert("取り込み", isPresented: Binding(get: { app.lastNotice != nil }, set: { if !$0 { app.lastNotice = nil } })) {
+            Button("OK") { app.lastNotice = nil }
+        } message: {
+            Text(app.lastNotice ?? "")
+        }
     }
 }
 
