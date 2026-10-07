@@ -86,7 +86,18 @@ fi
 
 if [[ $RUN -eq 1 ]]; then
   echo "== 5/5 シミュレータで起動 =="
-  DEVICE="$(xcrun simctl list devices available | grep -E '^\s+iPhone' | grep -vE 'SE|mini' | tail -1 | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')"
+  # 使う端末は一度決めたら固定する（毎回変わるとホーム画面からアイコンが消えるため）。
+  # 別の端末に変えたい場合は  rm ~/.zekkei_sim  してから実行する。
+  SIMFILE="$HOME/.zekkei_sim"
+  DEVICE=""
+  if [[ -f "$SIMFILE" ]]; then
+    CAND="$(cat "$SIMFILE")"
+    xcrun simctl list devices available | grep -q "$CAND" && DEVICE="$CAND"
+  fi
+  if [[ -z "$DEVICE" ]]; then
+    DEVICE="$(xcrun simctl list devices available | grep -E '^\s+iPhone' | grep -vE 'SE|mini' | tail -1 | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')"
+    [[ -n "$DEVICE" ]] && printf '%s' "$DEVICE" > "$SIMFILE"
+  fi
   if [[ -z "$DEVICE" ]]; then
     echo "iPhone のシミュレータが見つかりません。Xcode → Settings → Components で iOS シミュレータを追加してください。"; exit 1
   fi
@@ -101,6 +112,18 @@ if [[ $RUN -eq 1 ]]; then
   xcrun simctl install "$DEVICE" "$APP" && xcrun simctl launch "$DEVICE" com.zekkeido.app >/dev/null && echo "起動しました。Simulator の画面を見てください。"
   echo "疑似的に走行させる:  xcrun simctl location $DEVICE start --speed=15 36.109,138.157 36.149,138.147 36.223,138.138"
   echo "位置を固定する:      xcrun simctl location $DEVICE set 36.109,138.157"
+  echo "次回アプリだけ開く:  ~/zekkei-open   （ビルドせずにホーム画面のアイコンから開くのと同じ）"
+  # ビルド無しで開き直すための短い起動コマンドを置く
+  cat > "$HOME/zekkei-open" <<EOS
+#!/bin/bash
+# 絶景道をシミュレータで開く（ビルドはしない）。最新版にするときは 20260905_setup_xcode.sh --run
+D="\$(cat "$SIMFILE")"
+xcrun simctl boot "\$D" 2>/dev/null || true
+open -a Simulator
+sleep 2
+xcrun simctl launch "\$D" com.zekkeido.app >/dev/null && echo "起動しました"
+EOS
+  chmod +x "$HOME/zekkei-open"
 else
   echo "== 5/5 Xcode で開く =="
   [[ $OPEN -eq 1 ]] && open ZekkeiTouring.xcodeproj
