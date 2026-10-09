@@ -153,6 +153,7 @@ def main():
     g = sub.add_parser("georeference", help="地図 API で形状を付ける"); g.add_argument("--limit", type=int, default=200)
     rp = sub.add_parser("repair", help="座標にできなかった道を Gemini の一般知識で言い直して再試行"); rp.add_argument("--limit", type=int, default=100)
     sub.add_parser("dedupe", help="重複統合")
+    sub.add_parser("recheck", help="概算距離と合わない形状を要確認に戻す（後から距離が分かった道の見直し）")
     sp = sub.add_parser("spots", help="展望台・飲食店・道の駅などを道の近くに位置付ける"); sp.add_argument("--limit", type=int)
     sub.add_parser("retry-spots", help="全ての道のスポットを位置付けし直す")
     rs = sub.add_parser("respot", help="取得済みの動画の文章から立ち寄りスポットを取り直す（Gemini・軽い問い合わせ）"); rs.add_argument("--limit", type=int)
@@ -194,6 +195,8 @@ def main():
         n = p.repair(args.limit); log(f"修復候補 {n} 本 → 形状 OK {p.georeference() if n else 0} 本")
     elif args.cmd == "dedupe":
         log(f"統合 {p.dedupe()} 組")
+    elif args.cmd == "recheck":
+        print(f"{p.recheck()} 本を要確認に戻しました")
     elif args.cmd == "spots":
         print(f"スポット {p.spots(args.limit)} 件")
     elif args.cmd == "photos":

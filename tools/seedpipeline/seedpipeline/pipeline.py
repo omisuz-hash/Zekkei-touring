@@ -187,6 +187,15 @@ class Pipeline:
             self.geo.calls = 0
         return ok
 
+    # 4a'. 見直し: 後から分かった概算距離と形状が合わない道を、修復の対象に戻す ----------
+    def recheck(self) -> int:
+        changed = self.store.recheck_geometry()
+        for name, km, approx in changed[:20]:
+            log(f"見直し: {name} 経路 {km:.0f} km / 想定 {approx:.0f} km → 要確認に戻します")
+        if len(changed) > 20:
+            log(f"  ほか {len(changed) - 20} 本")
+        return len(changed)
+
     # 4b'. スポット取り直し: 取得済みの文章から、立ち寄った店・展望台だけを聞き直す（軽い問い合わせ） ----------
     def respot(self, limit: int | None = None) -> int:
         if not self.llm:
@@ -391,6 +400,7 @@ class Pipeline:
         for i in range(max_rounds if until_empty else 1):
             fetched = self._stage("取得", self.fetch)
             extracted = self._stage("抽出", self.extract)
+            self._stage("見直し", self.recheck)
             geo = self._stage("形状", self.georeference)
             if self._stage("修復", self.repair):
                 geo += self._stage("形状（修復後）", self.georeference)

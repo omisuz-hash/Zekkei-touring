@@ -57,6 +57,14 @@ def _num(v, lo: float, hi: float, as_int: bool = False):
     return int(round(x)) if as_int else x
 
 
+def _median(xs: list) -> float:
+    v = sorted(float(x) for x in xs if x)
+    if not v:
+        return 0.0
+    n = len(v)
+    return v[n // 2] if n % 2 else (v[n // 2 - 1] + v[n // 2]) / 2
+
+
 def clean_road(road: dict) -> dict:
     r = dict(road)
     for h in ("scenery_hint", "winding_hint", "surface_hint", "rest_hint", "parking_hint"):
@@ -88,7 +96,8 @@ class Store:
         # 既存 DB への列追加（あれば無視）
         cols = {r[1] for r in self.db.execute("pragma table_info(roads)")}
         for col, typ in (("start_municipality", "text"), ("end_municipality", "text"), ("approx_length_km", "real"), ("repair_attempts", "integer default 0"),
-                         ("spots", "text"), ("spots_status", "text default 'pending'"), ("wiki_status", "text default 'pending'")):
+                         ("spots", "text"), ("spots_status", "text default 'pending'"), ("wiki_status", "text default 'pending'"),
+                         ("approx_samples", "text")):
             if col not in cols:
                 self.db.execute(f"alter table roads add column {col} {typ}")
         # spots 表も同様（写真の列は後から追加された）
@@ -182,6 +191,9 @@ class Store:
                              json.dumps(road.get("via_labels", []), ensure_ascii=False), road.get("summary", ""), road.get("cautions", ""),
                              road.get("season", ""), *[road.get(h) for h in hints], road.get("confidence", 0),
                              road.get("start_municipality", ""), road.get("end_municipality", ""), road.get("approx_length_km") or None))
+            if road.get("approx_length_km"):
+                self.db.execute("update roads set approx_samples=? where key=?",
+                                (json.dumps([road["approx_length_km"]]), key))
             road_id = self.db.execute("select id from roads where key=?", (key,)).fetchone()["id"]
             self._merge_spots(road_id, road.get("spots", []), video_id, [])
         else:
@@ -203,8 +215,12 @@ class Store:
             for col in ("start_municipality", "end_municipality"):
                 if road.get(col) and not r[col]:
                     sets.append(f"{col}=?"); vals.append(road[col])
-            if road.get("approx_length_km") and not r["approx_length_km"]:
-                sets.append("approx_length_km=?"); vals.append(road["approx_length_km"])
+            if road.get("approx_length_km"):
+                samples = json.loads((r["approx_samples"] if "approx_samples" in r.keys() else None) or "[]")
+                samples.append(road["approx_length_km"])
+                samples = samples[-25:]
+                sets.append("approx_samples=?"); vals.append(json.dumps(samples))
+                sets.append("approx_length_km=?"); vals.append(_median(samples))
             self.db.execute(f"update roads set {', '.join(sets)}, updated_at=datetime('now') where id=?", (*vals, road_id))
             self._merge_spots(road_id, road.get("spots", []), video_id, json.loads(r["spots"] or "[]") if "spots" in r.keys() else [])
         cur = self.db.execute("insert or ignore into road_videos(road_id,video_id,timestamp,evidence,confidence) values (?,?,?,?,?)",
@@ -318,6 +334,24 @@ class Store:
         cur = self.db.execute("update roads set spots_status='pending' where geo_status='ok'")
         self.db.commit()
         return cur.rowcount
+
+    def recheck_geometry(self, low: float = 0.4, high: float = 2.5) -> list[tuple[str, float, float]]:
+        """形状づけの後に概算距離が判明・更新された道を見直す。
+        最初に形状を付けた時点では概算距離が無く、後から別の動画で分かることがあるため"""
+        changed = []
+        rows = self.db.execute("""select id, name, approx_length_km, length_m from roads
+                                   where geo_status='ok' and coalesce(approx_length_km,0) > 0 and length_m is not null""").fetchall()
+        for r in rows:
+            km = r["length_m"] / 1000
+            ratio = km / r["approx_length_km"]
+            if low <= ratio <= high:
+                continue
+            self.db.execute("""update roads set geo_status='suspect', repair_attempts=0,
+                               geo_error=? where id=?""",
+                            (f"距離が想定と合いません（経路 {km:.0f} km / 想定 {r['approx_length_km']:.0f} km）", r["id"]))
+            changed.append((r["name"], km, r["approx_length_km"]))
+        self.db.commit()
+        return changed
 
     def roads_pending_geo(self, limit: int) -> list[dict]:
         return [dict(r) for r in self.db.execute("select * from roads where geo_status='pending' order by mentions desc, confidence desc limit ?", (limit,))]
