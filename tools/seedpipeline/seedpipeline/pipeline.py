@@ -16,6 +16,15 @@ def log(msg: str):
 
 
 class Pipeline:
+    def out_of_time(self, stage: str = "") -> bool:
+        """制限時間を超えたか。超えていれば一度だけ知らせる（残りは翌日の実行で続きから処理される）"""
+        if self.deadline is None or time.monotonic() < self.deadline:
+            return False
+        if not self._told_timeout:
+            self._told_timeout = True
+            log(f"制限時間（{self.cfg.time_budget_min} 分）に達したため、ここで切り上げます。残りは次回の実行で続きから処理されます。")
+        return True
+
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self.store = Store(cfg.db_path)
@@ -23,6 +32,9 @@ class Pipeline:
         self.yt = YouTube(cfg.youtube_api_key, cfg.youtube_daily_budget, quota["youtube_units"]) if cfg.youtube_api_key else None
         self.llm = Gemini(cfg.gemini_api_key, cfg.gemini_model) if cfg.gemini_api_key else None
         self._geo = None
+        self._told_timeout = False
+        self.deadline = time.monotonic() + self.cfg.time_budget_min * 60 if self.cfg.time_budget_min > 0 else None
+
 
     @property
     def geo(self):
@@ -111,6 +123,7 @@ class Pipeline:
         n_roads = 0
         self.rate_limited = False
         for v in self.store.videos_by_status("fetched", limit):
+            if self.out_of_time(): break
             v["chapters"] = json.loads(v["chapters"] or "[]")
             v["tags"] = json.loads(v["tags"] or "[]")
             comments = json.loads(v["comments"] or "[]")
@@ -157,6 +170,7 @@ class Pipeline:
     def georeference(self, limit: int | None = None) -> int:
         ok = 0
         for r in self.store.roads_pending_geo(limit or self.cfg.max_geo_per_run):
+            if self.out_of_time(): break
             r["via_labels"] = json.loads(r["via_labels"] or "[]")
             try:
                 g = build_geometry(self.geo, r)
@@ -180,6 +194,7 @@ class Pipeline:
         n = 0
         self.rate_limited = False
         for v in self.store.videos_for_respot(limit or self.cfg.max_respot_per_run):
+            if self.out_of_time(): break
             roads = self.store.roads_for_video(v["id"])[:5]
             if not roads:
                 self.store.mark_video_spots_done(v["id"])
@@ -214,6 +229,7 @@ class Pipeline:
         from .wiki import spots_along
         n = 0
         for r in self.store.roads_pending_wiki(limit or self.cfg.max_wiki_per_run):
+            if self.out_of_time(): break
             try:
                 sps = spots_along(r)
             except HTTPError as e:
@@ -239,6 +255,7 @@ class Pipeline:
         from .spots import build_spots
         n = 0
         for r in self.store.roads_pending_spots(limit or self.cfg.max_spots_per_run):
+            if self.out_of_time(): break
             try:
                 sps = build_spots(self.geo, r)
             except Exception as e:  # 1 本の失敗で止めない
@@ -262,6 +279,7 @@ class Pipeline:
         tally = {"commons": 0, "wikipedia": 0, "youtube": 0, "none": 0, "error": 0}
         first_error = None
         for sp in self.store.spots_pending_photo(limit or self.cfg.max_photos_per_run):
+            if self.out_of_time(): break
             url = credit = source = None
             # 1) Commons: 地点の周辺の写真。展望台・峠・温泉は広めに、飲食店は店の近くだけ
             wide = sp["kind"] in ("viewpoint", "pass", "onsen", "rest")

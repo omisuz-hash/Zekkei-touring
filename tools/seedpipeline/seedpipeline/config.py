@@ -31,6 +31,8 @@ class Config:
     max_photos_per_run: int = field(default_factory=lambda: int(_env("SEED_MAX_PHOTOS", "400")))
     max_respot_per_run: int = field(default_factory=lambda: int(_env("SEED_MAX_RESPOT", "400")))
     max_wiki_per_run: int = field(default_factory=lambda: int(_env("SEED_MAX_WIKI", "300")))
+    # 1 回の実行の制限時間（分）。0 で無制限。毎朝 3 時開始で 6 時台には終わらせる
+    time_budget_min: int = field(default_factory=lambda: int(_env("SEED_TIME_BUDGET_MIN", "180")))
     # 当たりチャンネルの投稿一覧を 1 回の実行でたどる数
     channels_per_run: int = field(default_factory=lambda: int(_env("SEED_CHANNELS_PER_RUN", "5")))
     # 動画の長さ（秒）。短すぎる（Shorts）と長すぎる（生配信）は除外
