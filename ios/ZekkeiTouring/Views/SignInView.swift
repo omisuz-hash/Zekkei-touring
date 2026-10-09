@@ -76,9 +76,9 @@ struct SignInView: View {
                 #endif
                 HStack(spacing: 0) {
                     Text("続けることで ").foregroundStyle(ZK.caption)
-                    Link("利用規約", destination: URL(string: "https://example.com/terms")!).foregroundStyle(ZK.accent)
+                    Link("利用規約", destination: AppLinks.terms).foregroundStyle(ZK.accent)
                     Text(" と ").foregroundStyle(ZK.caption)
-                    Link("プライバシーポリシー", destination: URL(string: "https://example.com/privacy")!).foregroundStyle(ZK.accent)
+                    Link("プライバシーポリシー", destination: AppLinks.privacy).foregroundStyle(ZK.accent)
                     Text(" に同意したものとみなします").foregroundStyle(ZK.caption)
                 }
                 .font(.system(size: 11)).frame(maxWidth: .infinity)

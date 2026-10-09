@@ -105,9 +105,9 @@ struct ProfileView: View {
                     // サポート（Apple 審査 1.2: 連絡先の公開、通報の説明）
                     CaptionLabel(text: "サポート", size: 10)
                     VStack(spacing: 0) {
-                        linkRow("問い合わせ", url: URL(string: "mailto:support@example.com")!)
+                        linkRow("問い合わせ", url: AppLinks.support)
                         Divider().overlay(ZK.divider)
-                        linkRow("利用規約・プライバシーポリシー", url: URL(string: "https://example.com/terms")!)
+                        linkRow("利用規約・プライバシーポリシー", url: AppLinks.terms)
                         Divider().overlay(ZK.divider)
                         NavigationLink {
                             ScrollView {
