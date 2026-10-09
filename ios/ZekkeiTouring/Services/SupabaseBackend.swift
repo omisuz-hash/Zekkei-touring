@@ -56,6 +56,12 @@ final class SupabaseBackend: Backend {
         return rows.first
     }
 
+    func deleteAccount() async throws {
+        _ = try requireUser()
+        try await client.rpc("delete_account").execute()
+        try? await client.auth.signOut()
+    }
+
     func setDisplayName(_ name: String) async throws -> String {
         _ = try requireUser()
         let v: String = try await client.rpc("set_display_name", params: ["p_name": name]).execute().value

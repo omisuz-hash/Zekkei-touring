@@ -7,6 +7,8 @@ struct ProfileView: View {
     @State private var showSignIn = false
     @State private var showNickname = false
     @State private var showRegion = false
+    @State private var showDeleteConfirm = false
+    @State private var isDeleting = false
 
     var body: some View {
         NavigationStack {
@@ -123,6 +125,9 @@ struct ProfileView: View {
                     if app.isSignedIn {
                         Button("ログアウト") { Task { await app.signOut() } }
                             .font(.system(size: 14)).foregroundStyle(ZK.errorText).frame(maxWidth: .infinity).padding(.top, 8)
+                        Button(isDeleting ? "削除中…" : "アカウントを削除") { showDeleteConfirm = true }
+                            .font(.system(size: 13)).foregroundStyle(ZK.caption).frame(maxWidth: .infinity).padding(.top, 4)
+                            .disabled(isDeleting)
                     }
                 }
                 .padding(.horizontal, 16).padding(.bottom, 24)
@@ -132,6 +137,15 @@ struct ProfileView: View {
             .sheet(isPresented: $showSignIn) { SignInView() }
             .sheet(isPresented: $showNickname) { NicknameView() }
             .sheet(isPresented: $showRegion) { RegionPickerView() }
+            .alert("アカウントを削除しますか", isPresented: $showDeleteConfirm) {
+                Button("削除する", role: .destructive) {
+                    isDeleting = true
+                    Task { _ = await app.deleteAccount(); isDeleting = false }
+                }
+                Button("キャンセル", role: .cancel) {}
+            } message: {
+                Text("プロフィール・走行記録・評価・投稿した写真・閲覧枠を削除します。公開済みの絶景道そのものは、他の方が見られる状態のまま残り、あなたとの結び付けだけが外れます。この操作は取り消せません。")
+            }
             .refreshable { await app.refreshAccount() }
         }
         .preferredColorScheme(.dark)

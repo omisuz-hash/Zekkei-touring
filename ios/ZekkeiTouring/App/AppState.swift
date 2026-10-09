@@ -72,6 +72,21 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// アカウントを削除する。成功したら true
+    func deleteAccount() async -> Bool {
+        do {
+            try await backend.deleteAccount()
+            profile = nil
+            isSignedIn = false
+            creditBalance = 0
+            unlockedRoadIds = []
+            return true
+        } catch {
+            lastError = error.localizedDescription
+            return false
+        }
+    }
+
     func bootstrap() async {
         await backend.restoreSession()
         await refreshAccount()

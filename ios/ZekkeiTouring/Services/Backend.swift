@@ -11,6 +11,8 @@ protocol Backend: AnyObject {
     /// 開発・検証用: 匿名（ゲスト）ログイン。Supabase 側で Anonymous sign-ins を有効にする
     func signInAsGuest() async throws
     func signOut() async throws
+    /// アカウントと本人の情報を削除する（公開済みの絶景道は残り、投稿者との結び付けだけ外れる）
+    func deleteAccount() async throws
 
     func profile() async throws -> Profile?
     /// ニックネームを変更する（2〜20 文字。URL やアカウント名は不可）
@@ -91,6 +93,7 @@ final class MockBackend: Backend {
     func signInWithApple(idToken: String, nonce: String) async throws { currentUserId = UUID() }
     func signInAsGuest() async throws { currentUserId = UUID() }
     func signOut() async throws { currentUserId = nil }
+    func deleteAccount() async throws { currentUserId = nil }
 
     private var mockName = "ライダー0142"
     private var mockNameSet = false
