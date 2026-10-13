@@ -126,9 +126,9 @@ PL
   if ! grep -q "ARCHIVE SUCCEEDED" build/last_archive.log; then
     if grep -q "no devices" build/last_archive.log; then
       echo
-      echo "ヒント: 開発用の証明書を作ろうとして止まっています。Xcode を一度開いて"
-      echo "  Settings → Accounts → チームを選んで Download Manual Profiles を押すか、"
-      echo "  iPhone を Mac に繋いで Xcode に認識させてから、もう一度実行してください。"
+      echo "ヒント: Apple の仕様で、書き出しには実機の登録が 1 台必要です。"
+      echo "  iPhone を Mac に USB で繋ぎ、iPhone 側で「このコンピュータを信頼」を選んでから、もう一度実行してください。"
+      echo "  繋ぐだけで端末が自動登録されます（TestFlight の受け取りには使いません）。"
     fi
     echo "== 書き出しに失敗しました。上の error: 行を Claude に貼ってください（全文は build/last_archive.log） =="; exit 1
   fi
