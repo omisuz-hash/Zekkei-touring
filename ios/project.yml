@@ -57,6 +57,8 @@ targets:
             UTTypeConformsTo: [public.xml]
             UTTypeTagSpecification:
               public.filename-extension: [tcx]
+        # 受け取ったファイルは元の場所のまま読む（コピーを作らない）
+        LSSupportsOpeningDocumentsInPlace: true
         CFBundleDocumentTypes:
           - CFBundleTypeName: 走行記録
             LSHandlerRank: Alternate
