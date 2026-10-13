@@ -124,6 +124,12 @@ PL
     CURRENT_PROJECT_VERSION="$BUILD_NO" MARKETING_VERSION="${ZEKKEI_VERSION:-0.1.0}" \
     -allowProvisioningUpdates archive 2>&1 | tee build/last_archive.log | grep -E "error:|ARCHIVE (SUCCEEDED|FAILED)" | sort -u
   if ! grep -q "ARCHIVE SUCCEEDED" build/last_archive.log; then
+    if grep -q "no devices" build/last_archive.log; then
+      echo
+      echo "ヒント: 開発用の証明書を作ろうとして止まっています。Xcode を一度開いて"
+      echo "  Settings → Accounts → チームを選んで Download Manual Profiles を押すか、"
+      echo "  iPhone を Mac に繋いで Xcode に認識させてから、もう一度実行してください。"
+    fi
     echo "== 書き出しに失敗しました。上の error: 行を Claude に貼ってください（全文は build/last_archive.log） =="; exit 1
   fi
   xcodebuild -exportArchive -archivePath build/ZekkeiTouring.xcarchive \

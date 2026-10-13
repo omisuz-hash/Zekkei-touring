@@ -73,6 +73,10 @@ targets:
       Debug: Local.xcconfig
       Release: Local.xcconfig
     settings:
+      configs:
+        Release:
+          # 配布（TestFlight / App Store）は配布用の証明書を使う
+          "CODE_SIGN_IDENTITY[sdk=iphoneos*]": Apple Distribution
       base:
         SWIFT_VERSION: "5.10"
         TARGETED_DEVICE_FAMILY: "1"
