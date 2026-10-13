@@ -33,6 +33,10 @@ targets:
       path: ZekkeiTouring/Resources/Info.plist
       properties:
         CFBundleDisplayName: 絶景道
+        # 表示用の版（MARKETING_VERSION）とビルド番号（CURRENT_PROJECT_VERSION）。配布時にスクリプトが上書きする
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSLocationWhenInUseUsageDescription: 走行した道を記録し、絶景道として切り出すために位置情報を使用します。
@@ -73,6 +77,10 @@ targets:
         SWIFT_VERSION: "5.10"
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
+        # Team ID は Local.xcconfig（20260905_setup_xcode.sh が生成、git 管理外）から渡す
+        DEVELOPMENT_TEAM: $(ZEKKEI_TEAM_ID)
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         PRODUCT_BUNDLE_IDENTIFIER: com.zekkeido.app
         # シミュレータ向けは署名不要にする（チーム未選択でも起動できる）

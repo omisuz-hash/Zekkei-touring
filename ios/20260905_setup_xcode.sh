@@ -4,17 +4,29 @@
 #   ./20260905_setup_xcode.sh --no-open  Xcode を開かない（コンパイル結果だけ見る）
 #   ./20260905_setup_xcode.sh --no-apple-signin   無料の Apple ID で署名エラーが出るときに、Apple でサインインの機能を外して生成
 #   ./20260905_setup_xcode.sh --run      Xcode の画面操作なしで、シミュレータを起動してアプリを入れて開く（署名不要）
+#   ./20260905_setup_xcode.sh --archive  配布用に書き出す（TestFlight へ送る .ipa を作る）。Team ID が必要
+#   ./20260905_setup_xcode.sh --team XXXXXXXXXX   Team ID を登録して保存する（初回のみ。以後は省略可）
 # 前提: Xcode（App Store）、Homebrew。xcodegen は無ければこのスクリプトが入れる。
 # 接続先は ~/.zekkei_supabase から読み、Local.xcconfig（git 管理外）に書き出す。
 set -uo pipefail
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 cd "$(dirname "$0")"
-OPEN=1; APPLE=1; RUN=0
-for a in "$@"; do
-  [[ "$a" == "--no-open" ]] && OPEN=0
-  [[ "$a" == "--no-apple-signin" ]] && APPLE=0
-  [[ "$a" == "--run" ]] && { RUN=1; OPEN=0; }
+OPEN=1; APPLE=1; RUN=0; ARCHIVE=0
+TEAMFILE="$HOME/.zekkei_ios"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --no-open) OPEN=0 ;;
+    --no-apple-signin) APPLE=0 ;;
+    --run) RUN=1; OPEN=0 ;;
+    --archive) ARCHIVE=1; OPEN=0 ;;
+    --team) shift; printf 'ZEKKEI_TEAM_ID=%s\n' "${1:-}" > "$TEAMFILE"; chmod 600 "$TEAMFILE"; echo "Team ID を保存しました: $TEAMFILE" ;;
+  esac
+  shift
 done
+TEAM_ID=""
+if [[ -f "$TEAMFILE" ]]; then
+  TEAM_ID="$(sed -n 's/^ZEKKEI_TEAM_ID=//p' "$TEAMFILE" | tr -d '\r\n')"
+fi
 
 echo "== 1/5 ツールの確認 =="
 if ! xcode-select -p >/dev/null 2>&1 || ! xcodebuild -version >/dev/null 2>&1; then
@@ -56,7 +68,9 @@ SUPABASE_URL = ${SAFE_URL}
 SUPABASE_ANON_KEY = ${SUPABASE_PUBLISHABLE_KEY}
 GOOGLE_CLIENT_ID = ${GOOGLE_CLIENT_ID}
 GOOGLE_REVERSED_CLIENT_ID = ${REVERSED}
+ZEKKEI_TEAM_ID = ${TEAM_ID}
 XC
+[[ -n "$TEAM_ID" ]] && echo "Team ID: ${TEAM_ID}" || echo "Team ID: 未登録（実機・配布のビルドには --team で登録が必要）"
 
 echo "== 3/5 プロジェクト生成 =="
 SPEC=project.yml
@@ -82,6 +96,50 @@ if grep -q "BUILD SUCCEEDED" build/last_build.log; then
   echo "== コンパイル成功 =="
 else
   echo "== コンパイル失敗: 上の error: 行を Claude に貼ってください（全文は build/last_build.log） =="
+fi
+
+if [[ $ARCHIVE -eq 1 ]]; then
+  echo "== 5/5 配布用の書き出し =="
+  if [[ -z "$TEAM_ID" ]]; then
+    echo "Team ID が未登録です。次を一度だけ実行してください:  ./20260905_setup_xcode.sh --team あなたのTeamID"; exit 1
+  fi
+  mkdir -p build
+  cat > build/ExportOptions.plist <<PL
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>method</key><string>app-store-connect</string>
+  <key>teamID</key><string>${TEAM_ID}</string>
+  <key>destination</key><string>export</string>
+  <key>uploadSymbols</key><true/>
+  <key>signingStyle</key><string>automatic</string>
+</dict></plist>
+PL
+  # ビルド番号は毎回更新する（同じ番号は App Store Connect が受け付けないため）
+  BUILD_NO="$(date +%Y%m%d%H%M)"
+  echo "ビルド番号: $BUILD_NO"
+  rm -rf build/ZekkeiTouring.xcarchive build/export
+  xcodebuild -project ZekkeiTouring.xcodeproj -scheme ZekkeiTouring -configuration Release \
+    -destination 'generic/platform=iOS' -archivePath build/ZekkeiTouring.xcarchive \
+    CURRENT_PROJECT_VERSION="$BUILD_NO" MARKETING_VERSION="${ZEKKEI_VERSION:-0.1.0}" \
+    -allowProvisioningUpdates archive 2>&1 | tee build/last_archive.log | grep -E "error:|ARCHIVE (SUCCEEDED|FAILED)" | sort -u
+  if ! grep -q "ARCHIVE SUCCEEDED" build/last_archive.log; then
+    echo "== 書き出しに失敗しました。上の error: 行を Claude に貼ってください（全文は build/last_archive.log） =="; exit 1
+  fi
+  xcodebuild -exportArchive -archivePath build/ZekkeiTouring.xcarchive \
+    -exportOptionsPlist build/ExportOptions.plist -exportPath build/export \
+    -allowProvisioningUpdates 2>&1 | tee build/last_export.log | grep -E "error:|EXPORT SUCCEEDED" | sort -u
+  IPA="$(find build/export -name '*.ipa' | head -1)"
+  if [[ -z "$IPA" ]]; then
+    echo "== .ipa が作られませんでした。build/last_export.log を確認してください =="; exit 1
+  fi
+  echo "== 完成: $(pwd)/$IPA =="
+  echo
+  echo "TestFlight へ送るには、次のどちらかを行ってください。"
+  echo "  A) Xcode の Organizer から:  open build/ZekkeiTouring.xcarchive"
+  echo "  B) コマンドで送る（App Store Connect の App 用パスワードが必要）:"
+  echo "     xcrun altool --upload-app -f \"$IPA\" -t ios -u あなたのAppleID -p アプリ用パスワード"
+  exit 0
 fi
 
 if [[ $RUN -eq 1 ]]; then
