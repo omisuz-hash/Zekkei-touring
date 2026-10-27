@@ -39,6 +39,8 @@ create table if not exists quota (day text primary key, youtube_units integer de
   video_analyses integer default 0, geo_calls integer default 0);
 create table if not exists searches (keyword text, page integer, done integer default 0, primary key (keyword, page));
 create table if not exists geocache (q text primary key, lng real, lat real, pref text, addr text, created_at text);
+-- 同名を指しているのに形が重なっていない組（どちらかの区間が間違っている合図）
+create table if not exists name_conflicts (name_a text, name_b text, ratio real, primary key (name_a, name_b));
 """
 
 
@@ -369,10 +371,13 @@ class Store:
         q = f"select * from roads where geo_status in ({ph}) order by mentions desc, confidence desc"
         return [dict(r) for r in self.db.execute(q, statuses)]
 
-    def roads_to_repair(self, limit: int, min_mentions: int = 2) -> list[dict]:
+    def roads_to_repair(self, limit: int, min_mentions: int = 1) -> list[dict]:
+        """言い直しの対象。言及の多い道は 2 回まで試す（林道など確度の低い層も拾えるよう下限を下げた）"""
         return [dict(r) for r in self.db.execute(
-            """select * from roads where geo_status in ('failed','suspect') and coalesce(repair_attempts,0)=0
-               and mentions>=? and coalesce(confidence,0)>=0.5 order by mentions desc limit ?""", (min_mentions, limit))]
+            """select * from roads where geo_status in ('failed','suspect')
+               and coalesce(repair_attempts,0) < (case when mentions>=5 then 2 else 1 end)
+               and mentions>=? and coalesce(confidence,0)>=0.3
+               order by mentions desc, confidence desc limit ?""", (min_mentions, limit))]
 
     def apply_repair(self, road_id: int, fix: dict):
         self.db.execute("""update roads set start_label=?, start_municipality=?, end_label=?, end_municipality=?, via_labels=?,
@@ -394,9 +399,25 @@ class Store:
                 end_label=(select end_label from roads where id=?) where id=?""", (drop_id, drop_id, drop_id, drop_id, drop_id, keep_id))
         self._merge_rest(keep_id, drop_id)
 
-    def reset_geo(self, statuses: tuple[str, ...] = ("failed", "suspect", "ok")) -> int:
+    def save_name_conflicts(self, conflicts: list[tuple[str, str, float]]):
+        self.db.execute("create table if not exists name_conflicts (name_a text, name_b text, ratio real, primary key (name_a, name_b))")
+        self.db.execute("delete from name_conflicts")
+        self.db.executemany("insert or replace into name_conflicts(name_a,name_b,ratio) values (?,?,?)", conflicts)
+        self.db.commit()
+
+    def name_conflicts(self) -> list[dict]:
+        self.db.execute("create table if not exists name_conflicts (name_a text, name_b text, ratio real, primary key (name_a, name_b))")
+        return [dict(r) for r in self.db.execute("select * from name_conflicts order by ratio desc")]
+
+    def reset_geo(self, statuses: tuple[str, ...] = ("failed", "suspect", "ok"), reason_like: str | None = None) -> int:
+        """形状をやり直し対象に戻す。reason_like を渡すと、その文字を含む失敗理由の道だけに絞る"""
         ph = ",".join("?" * len(statuses))
-        cur = self.db.execute(f"update roads set geo_status='pending', geom=null, geo_error=null where geo_status in ({ph})", statuses)
+        q = f"update roads set geo_status='pending', geom=null, geo_error=null where geo_status in ({ph})"
+        args = list(statuses)
+        if reason_like:
+            q += " and coalesce(geo_error,'') like ?"
+            args.append(f"%{reason_like}%")
+        cur = self.db.execute(q, args)
         self.db.commit()
         return cur.rowcount
 

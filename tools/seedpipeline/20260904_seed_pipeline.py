@@ -110,8 +110,9 @@ def cmd_check(cfg: Config) -> bool:
 
 
 def cmd_selftest():
-    from seedpipeline.geo import decode_polyline, simplify, length_m, curviness, ewkt
-    from seedpipeline.merge import road_key, normalize_name, overlap_ratio
+    import math
+    from seedpipeline.geo import decode_polyline, simplify, length_m, curviness, ewkt, line_overlap, one_way_of_out_and_back
+    from seedpipeline.merge import road_key, normalize_name, name_relation, distinct_by_name, analyze
     from seedpipeline.store import Store
     line = decode_polyline("_p~iF~ps|U_ulLnnqC_mqNvxq`@")
     assert len(line) == 3 and abs(line[0][1] - 38.5) < 1e-6, line
@@ -119,7 +120,19 @@ def cmd_selftest():
     assert road_key({"name": "ビーナスライン（白樺湖〜美ヶ原）", "prefecture": "長野県"}) == road_key({"name": "ビーナスライン", "prefecture": "長野県"})
     assert road_key({"name": "国道152号", "road_number": "国道152号", "prefecture": "長野県"}) == "num:国道152号:長野"
     a = [(138.157, 36.109), (138.196, 36.103), (138.185, 36.119)]
-    assert overlap_ratio(a, a) == 1.0
+    assert line_overlap(a, a) == 1.0
+    # 頂点を間引いた線とも重なると判定できる（頂点同士の距離で測ると取りこぼす）
+    assert line_overlap(a, [a[0], a[-1]]) < 0.9 and line_overlap([a[0], a[1]], a) == 1.0
+    # 名前の判定: 同じ道の呼び分けは統合し、区別語・路線番号違いは統合しない
+    assert name_relation(normalize_name("ミルクロード"), normalize_name("阿蘇ミルクロード")) != "none"
+    assert name_relation(normalize_name("林道川乗線"), normalize_name("林道日向沢線")) == "none"
+    assert distinct_by_name(normalize_name("エサヌカ線"), normalize_name("裏エサヌカ線"))
+    assert distinct_by_name(normalize_name("国道42号"), normalize_name("国道421号"))
+    assert not distinct_by_name(normalize_name("ミルクロード"), normalize_name("阿蘇ミルクロード"))
+    # 行って戻る経路は片道に切り、別の道を通って戻る周回路はそのまま
+    assert one_way_of_out_and_back([(138.157 + i * 0.002, 36.109 + i * 0.001) for i in range(12)]
+                                  + [(138.157 + i * 0.002, 36.109 + i * 0.001) for i in range(11, -1, -1)]) is not None
+    assert one_way_of_out_and_back([(138.157 + 0.02 * math.cos(t * math.pi / 8), 36.109 + 0.02 * math.sin(t * math.pi / 8)) for t in range(17)]) is None
     assert length_m(a) > 5000 and 0 <= curviness(a) <= 1
     assert ewkt(a).startswith("SRID=4326;LINESTRING(138.157000 36.109000")
     st = Store(":memory:")
@@ -133,6 +146,14 @@ def cmd_selftest():
     assert rid == rid2 and r["mentions"] == 2 and abs(r["scenery_hint"] - 3.0) < 1e-9 and r["confidence"] == 0.8, r
     st.save_geo(rid, [list(c) for c in a], 5000, 0.3, None)
     assert st.roads(geo_ok_only=True)[0]["geo_status"] == "ok"
+    # 統合と確認対象の判定が通ること（確認対象の保存・読み出しも含む）
+    rs = [dict(r) for r in st.roads(statuses=("ok",))]
+    for x in rs:
+        x["_coords"] = [tuple(c) for c in json.loads(x["geom"])]
+    dups, conflicts = analyze(rs)
+    assert dups == [] and conflicts == []
+    st.save_name_conflicts([("道A", "道B", 0.1)])
+    assert st.name_conflicts()[0]["name_a"] == "道A"
     tmp = "out/_selftest.sql"
     os.makedirs("out", exist_ok=True)
     assert export_sql(st, tmp) == 1
@@ -172,6 +193,7 @@ def main():
     sub.add_parser("check", help="4 つのキーを検証")
     sub.add_parser("retry-failed", help="失敗した動画を再度抽出対象に戻す")
     rg = sub.add_parser("retry-geo", help="形状が失敗・要確認の道をやり直す"); rg.add_argument("--all", action="store_true", help="OK の道も含めて全てやり直す")
+    rg.add_argument("--reason", help="失敗理由にこの文字を含む道だけに絞る（例: 近すぎ）")
     sub.add_parser("reset-roads", help="抽出結果を全て消して抽出からやり直す（動画の取得結果は残る）")
     args = ap.parse_args()
 
@@ -230,7 +252,7 @@ def main():
             print(f"{k}: {v}")
         print("quota:", p.store.quota())
     elif args.cmd == "retry-geo":
-        log(f"{p.retry_geo(args.all)} 本の形状をやり直し対象にしました")
+        log(f"{p.retry_geo(args.all, args.reason)} 本の形状をやり直し対象にしました")
     elif args.cmd == "reset-roads":
         log(f"{p.reset_roads()} 本の道を消し、動画を抽出前に戻しました")
     elif args.cmd == "retry-failed":

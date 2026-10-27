@@ -211,16 +211,26 @@ class Gemini:
         "required": ["known", "start_label", "end_label"],
     }
 
-    def refine_road(self, name: str, prefecture: str, road_number: str, start: str, end: str) -> dict:
+    def refine_road(self, name: str, prefecture: str, road_number: str, start: str, end: str, reason: str = "") -> dict:
         """地図で座標にできなかった道について、一般知識で起点・終点を具体的に言い直す"""
+        hint = ""
+        if "周回" in reason or "往復" in reason:
+            hint = ("\nこの道は始点に戻ってくる道（周回路、または行き止まりの往復）です。"
+                    "start_label と end_label は同じ地点にしたうえで、via_labels に一周の途中の地点"
+                    "（対岸、反対側の集落、湖の向かいなど）か、行き止まりの折り返し地点を必ず 1 つ以上入れてください。")
+        elif "取り違え" in reason:
+            hint = ("\nこれまでの始点・終点は、名前が違うのに地図では同じ場所に解決されてしまいました。"
+                    "交差点名や「〜入口」のような呼び方は避け、道の駅・峠・駅・IC・展望台など、"
+                    "地図で一意に決まる施設名で答えてください。")
         text = f"""次の道について、あなたの一般知識で答えてください（動画の情報は不要です）。
 道の名前: {name}
 路線番号: {road_number or '不明'}
 都道府県: {prefecture or '不明'}
 これまでの始点・終点（地図で見つからなかった）: {start} 〜 {end}
+地図で失敗した理由: {reason or '不明'}
 
 この道の「走って気持ちいい区間」の起点と終点を、Google マップで検索して一意に決まる具体名（交差点名、道の駅、峠名、IC 名、駅名など）で答え、必ず市区町村名を添えてください。
-途中の代表的な地点（峠、展望台、道の駅）を最大 3 つと、その区間のおおよその距離 km も答えてください。知らない道なら known を false にしてください。"""
+途中の代表的な地点（峠、展望台、道の駅）を最大 3 つと、その区間のおおよその距離 km も答えてください。知らない道なら known を false にしてください。{hint}"""
         return self._generate([{"text": text}], self.REFINE_SCHEMA, temperature=0.1)
 
     def list_models(self) -> list[str]:

@@ -86,8 +86,17 @@ def export_report(store, path: str) -> None:
     s = store.stats()
     roads = store.roads()
     lines = [f"# シード自動収集レポート（{date.today().isoformat()}）", "",
-             "## 集計", ""] + [f"- {k}: {v}" for k, v in sorted(s.items())] + ["", "## 道の一覧（言及数順）", "",
-             "| 名前 | 都道府県 | 区間 | 言及 | 確度 | 距離 | 形状 |", "|---|---|---|---|---|---|---|"]
+             "## 集計", ""] + [f"- {k}: {v}" for k, v in sorted(s.items())]
+    conflicts = store.name_conflicts() if hasattr(store, "name_conflicts") else []
+    if conflicts:
+        lines += ["", "## 確認が必要な組（同名を指すが形が重なっていない）", "",
+                  "どちらかの区間が間違っている合図。統合はせず、両方を残している。", "",
+                  "| 名前 A | 名前 B | 重なり |", "|---|---|---|"]
+        lines += [f"| {c['name_a']} | {c['name_b']} | {c['ratio']:.0%} |" for c in conflicts[:60]]
+        if len(conflicts) > 60:
+            lines.append(f"| ほか {len(conflicts) - 60} 組 | | |")
+    lines += ["", "## 道の一覧（言及数順）", "",
+              "| 名前 | 都道府県 | 区間 | 言及 | 確度 | 距離 | 形状 |", "|---|---|---|---|---|---|---|"]
     for r in roads:
         L = f"{(r['length_m'] or 0) / 1000:.1f} km" if r["length_m"] else "-"
         note = f" ({(r['geo_error'] or '')[:50]})" if r['geo_status'] in ('failed', 'suspect') else ""

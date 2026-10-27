@@ -123,6 +123,95 @@ def curviness(coords: list[tuple[float, float]]) -> float:
     return min(1.0, (turn / (L / 1000)) / 700)
 
 
+# ---- 形の重なりを測る道具 ------------------------------------------------
+# 形状は直線区間の点を間引いて保存しているため、頂点同士の距離で測ると
+# 直線が長い道（オロロンライン、エサヌカ線など）で重なりを取りこぼす。
+# 点を等間隔に打ち直し、相手は線分として扱う。
+CELL_DEG = 0.01  # 緯度経度 0.01 度 ≒ 1.1 km。候補を絞る粗い格子の一辺
+
+
+def cell_of(p: tuple[float, float]) -> tuple[int, int]:
+    return (int(p[0] / CELL_DEG), int(p[1] / CELL_DEG))
+
+
+def point_to_segment_m(p: tuple[float, float], a: tuple[float, float], b: tuple[float, float]) -> float:
+    """点 p と線分 ab の距離。緯度に応じて経度を縮めた平面で近似する"""
+    scale = math.cos(math.radians(p[1]))
+    px, py = p[0] * scale, p[1]
+    ax, ay = a[0] * scale, a[1]
+    bx, by = b[0] * scale, b[1]
+    dx, dy = bx - ax, by - ay
+    if dx == 0 and dy == 0:
+        return haversine_m(p, a)
+    t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)))
+    return haversine_m(p, ((ax + t * dx) / scale, ay + t * dy))
+
+
+def resample(coords: list[tuple[float, float]], step_m: float = 100.0) -> list[tuple[float, float]]:
+    """点列を一定間隔で打ち直す"""
+    if len(coords) < 2:
+        return list(coords)
+    out = [coords[0]]
+    carry = 0.0
+    for i in range(1, len(coords)):
+        a, b = coords[i - 1], coords[i]
+        d = haversine_m(a, b)
+        if d == 0:
+            continue
+        t = step_m - carry
+        while t < d:
+            f = t / d
+            out.append((a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f))
+            t += step_m
+        carry = (carry + d) % step_m
+    out.append(coords[-1])
+    return out
+
+
+def segment_index(coords: list[tuple[float, float]]) -> dict[tuple[int, int], list]:
+    """点列を線分に分け、粗い格子に登録する。重なり判定の総当たりを避けるため"""
+    grid: dict[tuple[int, int], list] = {}
+    for i in range(1, len(coords)):
+        a, b = coords[i - 1], coords[i]
+        n = max(1, int(max(abs(b[0] - a[0]), abs(b[1] - a[1])) / (CELL_DEG / 2)) + 1)
+        last = None
+        for k in range(n + 1):
+            f = k / n
+            c = cell_of((a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f))
+            if c != last:
+                grid.setdefault(c, []).append((a, b))
+                last = c
+    return grid
+
+
+def overlap_ratio(samples: list[tuple[float, float]], grid: dict, tol_m: float = 120.0) -> float:
+    """打ち直した点列 samples のうち、grid に入れた線に tol_m 以内で沿う割合"""
+    if not samples or not grid:
+        return 0.0
+    hit = 0
+    for p in samples:
+        cx, cy = cell_of(p)
+        near = False
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for a, b in grid.get((cx + dx, cy + dy), ()):
+                    if point_to_segment_m(p, a, b) < tol_m:
+                        near = True
+                        break
+                if near:
+                    break
+            if near:
+                break
+        if near:
+            hit += 1
+    return hit / len(samples)
+
+
+def line_overlap(a: list[tuple[float, float]], b: list[tuple[float, float]], tol_m: float = 120.0) -> float:
+    """a の線のうち b の線に沿う割合。組を 1 回だけ比べるときに使う"""
+    return overlap_ratio(resample(a), segment_index(b), tol_m)
+
+
 def ewkt(coords: list[tuple[float, float]]) -> str:
     return "SRID=4326;LINESTRING(" + ", ".join(f"{lng:.6f} {lat:.6f}" for lng, lat in coords) + ")"
 
@@ -258,6 +347,23 @@ def _pref_core(p: str) -> str:
     return p.replace("北海道", "北海") if p == "北海道" else p
 
 
+# 始点に戻ってくる道を示す語。地点名が同じ場合と合わせて、周回・往復の判断に使う
+LOOP_WORDS = ("周遊", "周回", "環状", "一周", "外周", "ぐるり", "循環")
+
+
+def one_way_of_out_and_back(line: list[tuple[float, float]]) -> list[tuple[float, float]] | None:
+    """始点に戻る経路のうち、往路と復路が同じ道をたどるもの（行き止まりの林道など）は
+    折り返し地点までの片道を返す。別の道を通って戻る周回路なら None"""
+    if len(line) < 6:
+        return None
+    far = max(range(len(line)), key=lambda i: haversine_m(line[0], line[i]))
+    if far < 2 or far > len(line) - 3:
+        return None
+    out, back = line[:far + 1], line[far:]
+    a, b = overlap_ratio(resample(out), segment_index(back)), overlap_ratio(resample(back), segment_index(out))
+    return out if min(a, b) >= 0.7 else None
+
+
 # 通称で呼ばれる道は 1 本あたりこの距離を超えることはまれ。超えたら「要確認」に落とす
 MAX_PLAUSIBLE_M = 200_000
 
@@ -300,17 +406,33 @@ def build_geometry(geo, road: dict) -> dict:
     end = geocode_checked(road["end_label"], road.get("end_municipality", ""), True)
     points.append(end)
 
+    approx = float(road.get("approx_length_km") or 0)
     straight = haversine_m(points[0], points[-1])
+    # 始点と終点がほぼ同じ座標になる道には、周回路・行き止まりの往復と、地点名の取り違えが混ざる。
+    # 地点名が同じか名前が周回を示すものだけを形状づけに進め、残りは取り違えとして修復に回す
+    closed = False
     if straight < 300:
-        raise GeoError("始点と終点が近すぎます（同一地点の可能性）")
+        sl, _ = clean_label(road["start_label"])
+        el, _ = clean_label(road["end_label"])
+        same_ends = re.sub(r"\s+", "", sl) == re.sub(r"\s+", "", el)
+        if not (same_ends or any(w in (road.get("name") or "") for w in LOOP_WORDS)):
+            raise GeoError("始点と終点が同じ座標になりました（地点名の取り違えの可能性）")
+        if len(points) < 3:
+            raise GeoError("周回・往復の道ですが、途中の地点がないため形を引けません")
+        closed = True
     if straight > 250_000:
         raise GeoError("始点と終点が離れすぎています（250km 超）")
     # 経由地が始点〜終点の範囲から大きく外れていれば捨てる（誤認の経由地で大回りするのを防ぐ）
-    if len(points) > 2:
+    if len(points) > 2 and not closed:
         span = max(straight, 5_000) * 1.5
         points = [points[0]] + [p for p in points[1:-1] if haversine_m(points[0], p) < span and haversine_m(points[-1], p) < span] + [points[-1]]
-
-    approx = float(road.get("approx_length_km") or 0)
+    elif len(points) > 2 and closed and approx > 0:
+        # 周回・往復では始点から遠い経由地こそ正しい（折り返し地点・対岸）。
+        # 想定距離は片道・一周のどちらを指すか分からないため、明らかな外れだけを捨てる
+        radius = approx * 1000 * 1.5
+        points = [points[0]] + [p for p in points[1:-1] if haversine_m(points[0], p) < radius] + [points[-1]]
+        if len(points) < 3:
+            raise GeoError("周回・往復の道ですが、途中の地点がないため形を引けません")
 
     def plausibility(L: float) -> str | None:
         if approx > 0:
@@ -321,8 +443,13 @@ def build_geometry(geo, road: dict) -> dict:
 
     line = geo.route(points)
     L = length_m(line)
+    if closed:
+        # 行って戻るだけの道（行き止まりの林道など）は、折り返し地点までの片道を形状とする
+        one_way = one_way_of_out_and_back(line)
+        if one_way:
+            line, L = one_way, length_m(one_way)
     # 経由地が誤認で大回りしている場合は、始点・終点だけで引き直した方が想定距離に近いことがある
-    if len(points) > 2 and plausibility(L):
+    if len(points) > 2 and not closed and plausibility(L):
         alt = geo.route([points[0], points[-1]])
         La = length_m(alt)
         if approx > 0 and abs(La / 1000 - approx) < abs(L / 1000 - approx):
@@ -337,4 +464,4 @@ def build_geometry(geo, road: dict) -> dict:
     if L > MAX_PLAUSIBLE_M and not (approx > 0 and (L / 1000) / approx <= 1.5):
         suspect = f"1 本の道として長すぎます（{L / 1000:.0f} km）"
     return {"coords": line, "length_m": L, "curviness": curviness(line), "straight_m": straight,
-            "start": points[0], "end": points[-1], "suspect": suspect}
+            "start": line[0], "end": line[-1], "closed": closed, "suspect": suspect}

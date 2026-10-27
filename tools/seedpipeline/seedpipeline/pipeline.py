@@ -7,7 +7,7 @@ from .store import Store
 from .youtube import YouTube, QuotaExceeded, parse_chapters, looks_like_touring
 from .gemini import Gemini
 from .geo import make_geo, build_geometry, GeoError, CachedGeo
-from .merge import road_key, find_duplicates
+from .merge import road_key, analyze
 from .http import HTTPError
 
 
@@ -339,8 +339,10 @@ class Pipeline:
             return 0
         n = 0
         for r in self.store.roads_to_repair(limit):
+            if self.out_of_time(): break
             try:
-                fix = self.llm.refine_road(r["name"], r["prefecture"] or "", r["road_number"] or "", r["start_label"], r["end_label"])
+                fix = self.llm.refine_road(r["name"], r["prefecture"] or "", r["road_number"] or "",
+                                           r["start_label"], r["end_label"], r["geo_error"] or "")
                 self.store.add_quota(gemini_calls=1)
             except HTTPError as e:
                 if e.status == 429:
@@ -358,10 +360,11 @@ class Pipeline:
 
     # 5. 統合 ------------------------------------------------------------
     def dedupe(self) -> int:
-        roads = self.store.roads(geo_ok_only=True)
+        # 要確認の道も対象にする。形は信頼しないので、その形状を採用することはしない
+        roads = [r for r in self.store.roads(statuses=("ok", "suspect")) if r["geom"]]
         for r in roads:
             r["_coords"] = [tuple(c) for c in json.loads(r["geom"])]
-        pairs = find_duplicates(roads)
+        pairs, conflicts = analyze(roads)
         seen = set()
         n = 0
         for keep, drop, ratio, take_drop_geom in pairs:
@@ -371,10 +374,18 @@ class Pipeline:
             seen.add(drop)
             n += 1
             log(f"統合: {drop} → {keep}（重なり {ratio:.0%}{'・長い方の形状を採用' if take_drop_geom else ''}）")
+        # 統合で消えた道は確認対象から外す
+        alive = {r["name"] for r in self.store.roads()}
+        conflicts = [c for c in conflicts if c[0] in alive and c[1] in alive]
+        self.store.save_name_conflicts(conflicts)
+        for a, b, r in conflicts[:20]:
+            log(f"確認: 同名だが形が違う「{a}」と「{b}」（重なり {r:.0%}）")
+        if len(conflicts) > 20:
+            log(f"  ほか {len(conflicts) - 20} 組")
         return n
 
-    def retry_geo(self, include_ok: bool = False) -> int:
-        return self.store.reset_geo(("failed", "suspect", "ok") if include_ok else ("failed", "suspect"))
+    def retry_geo(self, include_ok: bool = False, reason_like: str | None = None) -> int:
+        return self.store.reset_geo(("failed", "suspect", "ok") if include_ok else ("failed", "suspect"), reason_like)
 
     def reset_roads(self) -> int:
         return self.store.reset_roads()
