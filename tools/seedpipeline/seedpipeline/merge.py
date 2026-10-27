@@ -59,10 +59,13 @@ def _road_numbers(name: str) -> set[str]:
     return {m.group(1) + m.group(2) for m in ROAD_NUMBER_RE.finditer(name)}
 
 
-def distinct_by_name(a: str, b: str) -> bool:
-    """名前の差が区別語（裏・旧道・方位）だけ、または路線番号が違うなら別の道"""
+def distinct_by_name(a: str, b: str, raw_a: str = "", raw_b: str = "") -> bool:
+    """名前の差が区別語（裏・旧道・方位）だけ、または路線番号が違うなら別の道。
+    raw_a / raw_b を渡すと、正規化で落ちる括弧の中の区別語も見る（「県道70号（裏ヤビツ）」など）"""
     for m in ASYMMETRIC_MARKERS:
         if (m in a) != (m in b):
+            return True
+        if raw_a and raw_b and (m in raw_a) != (m in raw_b):
             return True
     na, nb = _road_numbers(a), _road_numbers(b)
     if na and nb and not (na & nb):
@@ -177,7 +180,7 @@ def analyze(roads: list[dict]) -> tuple[list[tuple[int, int, float, bool]], list
     dups, conflicts = [], []
     for i, j in sorted(_candidate_pairs(items)):
         a, b = items[i], items[j]
-        if distinct_by_name(a["key"], b["key"]):
+        if distinct_by_name(a["key"], b["key"], a["name"], b["name"]):
             continue
         rel = name_relation(a["key"], b["key"])
         if rel == "none":
