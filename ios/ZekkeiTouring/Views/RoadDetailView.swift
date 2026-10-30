@@ -57,6 +57,15 @@ struct RoadDetailView: View {
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
+            // ナビの出発地の選択。ヒーロー地図からもボタンからも同じものを出す
+            .confirmationDialog("どこから走り始めますか", isPresented: $showNavOptions, titleVisibility: .visible) {
+                Button("絶景道の始点から終点まで") { openNavigation(.roadStart) }
+                Button("現在地から（始点を経由して走り切る）") { openNavigation(.currentLocation) }
+                Button("逆向きに走る（終点から始点へ）") { openNavigation(.reversed) }
+                Button("キャンセル", role: .cancel) {}
+            } message: {
+                Text("「現在地から」を選ぶと、始点までの道のりと道中が 1 本の経路になります。すでに始点の近くにいるときは「絶景道の始点から」が分かりやすいはずです。")
+            }
             .alert("通報の理由", isPresented: $showReport) {
                 TextField("理由", text: $reportReason)
                 Button("送信") { report(targetType: "road", id: road.id) }
@@ -135,12 +144,12 @@ struct RoadDetailView: View {
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(ZK.border, lineWidth: 1))
             .overlay(alignment: .bottomTrailing) {
-                Label("現在地からナビ", systemImage: "arrow.up.right.square")
+                Label("Google マップでナビ", systemImage: "arrow.up.right.square")
                     .font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
                     .padding(.horizontal, 10).padding(.vertical, 6).glassPill(radius: 999).padding(8)
             }
             .contentShape(Rectangle())
-            .onTapGesture { openNavigation(.currentLocation) }
+            .onTapGesture { showNavOptions = true }
         }
     }
 
@@ -371,14 +380,6 @@ struct RoadDetailView: View {
             Label("Google マップでナビ", systemImage: "arrow.triangle.turn.up.right.diamond")
         }
         .buttonStyle(PrimaryButtonStyle())
-        .confirmationDialog("どこから走り始めますか", isPresented: $showNavOptions, titleVisibility: .visible) {
-            Button("現在地から（始点を経由して走り切る）") { openNavigation(.currentLocation) }
-            Button("絶景道の始点から") { openNavigation(.roadStart) }
-            Button("逆向きに走る（終点から始点へ）") { openNavigation(.reversed) }
-            Button("キャンセル", role: .cancel) {}
-        } message: {
-            Text("「現在地から」なら、始点までの道のりと道中が 1 本の経路になります。走り出す前に 1 度開けば、あとは Google マップだけで足ります。")
-        }
     }
 
     private var videoSection: some View {
