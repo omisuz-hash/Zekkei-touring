@@ -135,8 +135,22 @@ PL
   xcodebuild -exportArchive -archivePath build/ZekkeiTouring.xcarchive \
     -exportOptionsPlist build/ExportOptions.plist -exportPath build/export \
     -allowProvisioningUpdates 2>&1 | tee build/last_export.log | grep -E "error:|EXPORT SUCCEEDED" | sort -u
-  IPA="$(find build/export -name '*.ipa' | head -1)"
+  IPA="$(find build/export -name '*.ipa' 2>/dev/null | head -1)"
   if [[ -z "$IPA" ]]; then
+    if grep -q "PLA Update available" build/last_export.log; then
+      echo
+      echo "ヒント: Apple の利用許諾契約（Program License Agreement）の更新が未承諾です。"
+      echo "  承諾するまで Apple 側が配布用証明書の発行を止めるため、「iOS Distribution が見つからない」も"
+      echo "  併せて出ます。アーカイブ自体は成功しているので、承諾後にもう一度実行すれば通ります。"
+      echo
+      echo "  1) https://developer.apple.com/account を開く（Account Holder のアカウントで）"
+      echo "  2) 画面上部の契約更新の案内から、更新された契約に同意する"
+      echo "  3) 数分おいて、もう一度  ./20260905_setup_xcode.sh --archive"
+    elif grep -q 'No signing certificate' build/last_export.log; then
+      echo
+      echo "ヒント: 配布用の証明書が Mac にありません。Xcode の Settings → Accounts で Apple ID を追加し、"
+      echo "  チームを選んで Manage Certificates から Apple Distribution を作成してから、もう一度実行してください。"
+    fi
     echo "== .ipa が作られませんでした。build/last_export.log を確認してください =="; exit 1
   fi
   echo "== 完成: $(pwd)/$IPA =="
