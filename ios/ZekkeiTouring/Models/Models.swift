@@ -133,12 +133,27 @@ struct ZekkeiRoad: Codable, Identifiable, Hashable {
     var coordinates: [CLLocationCoordinate2D] { geojson.points }
 
     /// Google マップで「この道に沿った経路」を表示する URL。始点・終点に加え、道に沿った経由地を最大 8 つ渡す
-    var googleMapsRouteURL: URL? {
-        let pts = coordinates
+    /// Google マップに渡す経路の出発地
+    enum RouteOrigin {
+        /// 現在地から出発し、絶景道の始点を経由して終点まで。走り出す前に 1 度開けば、
+        /// 始点までの道のりと道中が 1 本の経路としてつながる
+        case currentLocation
+        /// 絶景道の始点から終点まで。すでに始点の近くにいるとき向け
+        case roadStart
+        /// 絶景道の終点から始点へ逆走
+        case reversed
+    }
+
+    func googleMapsRouteURL(from origin: RouteOrigin = .currentLocation) -> URL? {
+        let pts = origin == .reversed ? coordinates.reversed().map { $0 } : coordinates
         guard let s = pts.first, let e = pts.last, pts.count >= 2 else { return nil }
         let f = { (c: CLLocationCoordinate2D) in String(format: "%.5f,%.5f", c.latitude, c.longitude) }
-        var waypoints: [String] = []
-        let n = min(8, max(0, pts.count - 2))
+        // Google マップの URL が受け取れる経由地は 9 か所まで。現在地から始める場合は
+        // 始点自体も経由地として渡すため、その分を差し引く
+        let fromCurrent = origin == .currentLocation
+        let maxVia = fromCurrent ? 7 : 8
+        var waypoints: [String] = fromCurrent ? [f(s)] : []
+        let n = min(maxVia, max(0, pts.count - 2))
         if n > 0 {
             for i in 1...n {
                 let idx = Int(Double(pts.count - 1) * Double(i) / Double(n + 1))
@@ -146,12 +161,12 @@ struct ZekkeiRoad: Codable, Identifiable, Hashable {
             }
         }
         var comps = URLComponents(string: "https://www.google.com/maps/dir/")!
-        comps.queryItems = [
-            URLQueryItem(name: "api", value: "1"),
-            URLQueryItem(name: "origin", value: f(s)),
-            URLQueryItem(name: "destination", value: f(e)),
-            URLQueryItem(name: "travelmode", value: "driving"),
-        ] + (waypoints.isEmpty ? [] : [URLQueryItem(name: "waypoints", value: waypoints.joined(separator: "|"))])
+        // origin を省くと Google マップは現在地を出発地として扱う
+        comps.queryItems = [URLQueryItem(name: "api", value: "1")]
+            + (fromCurrent ? [] : [URLQueryItem(name: "origin", value: f(s))])
+            + [URLQueryItem(name: "destination", value: f(e)),
+               URLQueryItem(name: "travelmode", value: "driving")]
+            + (waypoints.isEmpty ? [] : [URLQueryItem(name: "waypoints", value: waypoints.joined(separator: "|"))])
         return comps.url
     }
     /// 動画から自動抽出された道か（ユーザーの実走ではない）

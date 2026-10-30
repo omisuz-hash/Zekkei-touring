@@ -7,6 +7,8 @@
   python3 20260905_db_admin.py stats     道・動画・会員の件数
   python3 20260905_db_admin.py ping      アプリと同じ経路（REST API）で 1 回読む。無料枠の自動停止（7 日間無通信）を避けるため
   python3 20260905_db_admin.py sql "select count(*) from zekkei_roads"   任意の SQL（管理用）
+  python3 20260905_db_admin.py auth      ログイン方法（Apple / Google / 匿名）の現在の設定を表示
+  python3 20260905_db_admin.py auth-apply   同上を設定する（バックアップ → 適用 → 検証 → 失敗なら自動で戻す）
 
 接続情報は ~/.zekkei_supabase（20260905_setup_supabase.sh で作成）から読む。
 SQL の実行には Supabase の管理 API（Personal Access Token）を使う。
@@ -206,6 +208,94 @@ def cmd_ping():
         return False
 
 
+AUTH_KEYS = ("external_apple_enabled", "external_apple_client_id", "external_apple_additional_client_ids",
+             "external_google_enabled", "external_google_client_id", "external_google_additional_client_ids",
+             "external_google_skip_nonce_check", "external_anonymous_users_enabled", "site_url")
+BACKUP_DIR = os.path.expanduser("~/.zekkei_backups")
+
+
+def auth_config() -> dict:
+    ref = project_ref()
+    return api("GET", f"https://api.supabase.com/v1/projects/{ref}/config/auth",
+               None, {"Authorization": f"Bearer {env('SUPABASE_ACCESS_TOKEN')}"}) or {}
+
+
+def auth_patch(body: dict) -> dict:
+    ref = project_ref()
+    return api("PATCH", f"https://api.supabase.com/v1/projects/{ref}/config/auth",
+               body, {"Authorization": f"Bearer {env('SUPABASE_ACCESS_TOKEN')}"}) or {}
+
+
+def show_auth(cfg: dict, title: str = "現在の設定"):
+    print(f"-- {title} --")
+    for k in AUTH_KEYS:
+        if k in cfg:
+            print(f"  {k}: {cfg[k]!r}")
+    unknown = [k for k in AUTH_KEYS if k not in cfg]
+    if unknown:
+        print(f"  （この Supabase では未提供の項目: {', '.join(unknown)}）")
+
+
+def cmd_auth():
+    show_auth(auth_config())
+    print("\n変更するには auth-apply を実行してください。")
+
+
+def cmd_auth_apply():
+    """Apple / Google のログインを有効にする。
+    Apple は iOS アプリのバンドル ID を、Google は iOS の OAuth クライアント ID を受け付ける。
+    Google のクライアント ID は環境変数 GOOGLE_IOS_CLIENT_ID から読み、未設定なら Google は触らない。"""
+    bundle_id = os.environ.get("ZEKKEI_BUNDLE_ID", "com.zekkeido.app").strip()
+    google_id = os.environ.get("GOOGLE_IOS_CLIENT_ID", "").strip()
+
+    before = auth_config()
+    os.makedirs(BACKUP_DIR, mode=0o700, exist_ok=True)
+    stamp = __import__("datetime").datetime.now().strftime("%Y%m%d%H%M%S")
+    backup = os.path.join(BACKUP_DIR, f"auth_config_{stamp}.json")
+    with open(backup, "w", encoding="utf-8") as f:
+        json.dump(before, f, ensure_ascii=False, indent=2)
+    os.chmod(backup, 0o600)
+    print(f"バックアップ: {backup}")
+    show_auth(before, "変更前")
+
+    want = {"external_apple_enabled": True, "external_apple_client_id": bundle_id}
+    if google_id:
+        # iOS の GoogleSignIn は nonce を付けないため、その検証を外す必要がある
+        want.update({"external_google_enabled": True, "external_google_client_id": google_id,
+                     "external_google_skip_nonce_check": True})
+    else:
+        print("GOOGLE_IOS_CLIENT_ID が未設定のため、Google は変更しません（Apple のみ設定します）。")
+    # この Supabase が受け付けない項目は送らない
+    want = {k: v for k, v in want.items() if k in before or k.startswith("external_")}
+
+    print("\n-- これから設定する内容 --")
+    for k, v in want.items():
+        print(f"  {k}: {before.get(k)!r} → {v!r}")
+    if input("\n適用しますか（yes と入力）: ").strip() != "yes":
+        print("中止しました。設定は変更していません。")
+        return
+
+    try:
+        auth_patch(want)
+    except RuntimeError as e:
+        print(f"適用に失敗しました: {e}")
+        print("設定は変更されていません。")
+        return
+
+    after = auth_config()
+    bad = {k: (v, after.get(k)) for k, v in want.items() if after.get(k) != v}
+    if bad:
+        print("\n検証に失敗しました。次の項目が反映されていません:")
+        for k, (want_v, got) in bad.items():
+            print(f"  {k}: 期待 {want_v!r} / 実際 {got!r}")
+        print("バックアップの値に戻します。")
+        auth_patch({k: before[k] for k in want if k in before})
+        show_auth(auth_config(), "戻した結果")
+        return
+    show_auth(after, "変更後")
+    print("\n完了しました。iPhone でアプリを開き直してログインを試してください。")
+
+
 def main():
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
         print(__doc__); return
@@ -231,6 +321,10 @@ def run(cmd: str):
         cmd_stats()
     elif cmd == "ping":
         sys.exit(0 if cmd_ping() else 1)
+    elif cmd == "auth":
+        cmd_auth()
+    elif cmd == "auth-apply":
+        cmd_auth_apply()
     elif cmd == "sql":
         print(json.dumps(run_sql(sys.argv[2]), ensure_ascii=False, indent=2))
     else:

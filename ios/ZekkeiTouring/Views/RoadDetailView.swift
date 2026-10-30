@@ -15,6 +15,7 @@ struct RoadDetailView: View {
     @State private var reportReason = ""
     @State private var showSignIn = false
     @State private var showAddMedia = false
+    @State private var showNavOptions = false
 
     private var unlocked: Bool { app.isUnlocked(road) }
 
@@ -129,12 +130,12 @@ struct RoadDetailView: View {
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(ZK.border, lineWidth: 1))
             .overlay(alignment: .bottomTrailing) {
-                Label("Google マップで経路を開く", systemImage: "arrow.up.right.square")
+                Label("現在地からナビ", systemImage: "arrow.up.right.square")
                     .font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
                     .padding(.horizontal, 10).padding(.vertical, 6).glassPill(radius: 999).padding(8)
             }
             .contentShape(Rectangle())
-            .onTapGesture { openNavigation() }
+            .onTapGesture { openNavigation(.currentLocation) }
         }
     }
 
@@ -352,8 +353,18 @@ struct RoadDetailView: View {
                 }
             }
         }
-        Button { openNavigation() } label: { Label("Google マップでこの区間へナビ", systemImage: "arrow.triangle.turn.up.right.diamond") }
-            .buttonStyle(PrimaryButtonStyle())
+        Button { showNavOptions = true } label: {
+            Label("Google マップでナビ", systemImage: "arrow.triangle.turn.up.right.diamond")
+        }
+        .buttonStyle(PrimaryButtonStyle())
+        .confirmationDialog("どこから走り始めますか", isPresented: $showNavOptions, titleVisibility: .visible) {
+            Button("現在地から（始点を経由して走り切る）") { openNavigation(.currentLocation) }
+            Button("絶景道の始点から") { openNavigation(.roadStart) }
+            Button("逆向きに走る（終点から始点へ）") { openNavigation(.reversed) }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("「現在地から」なら、始点までの道のりと道中が 1 本の経路になります。走り出す前に 1 度開けば、あとは Google マップだけで足ります。")
+        }
     }
 
     private var videoSection: some View {
@@ -400,8 +411,8 @@ struct RoadDetailView: View {
         if app.isSignedIn { showAddMedia = true } else { showSignIn = true }
     }
 
-    private func openNavigation() {
-        guard let url = road.googleMapsRouteURL else { return }
+    private func openNavigation(_ origin: ZekkeiRoad.RouteOrigin) {
+        guard let url = road.googleMapsRouteURL(from: origin) else { return }
         UIApplication.shared.open(url)
     }
 }

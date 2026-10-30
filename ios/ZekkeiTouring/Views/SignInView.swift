@@ -90,6 +90,11 @@ struct SignInView: View {
     }
 
     private func signInWithGoogle() async {
+        // クライアント ID が無いまま呼ぶと GoogleSignIn が異常終了するため、先に止める
+        guard GIDSignIn.sharedInstance.configuration != nil else {
+            app.lastError = "このビルドでは Google ログインを利用できません（クライアント ID が未設定です）。Apple でサインインをお使いください。"
+            return
+        }
         guard let root = UIApplication.shared.connectedScenes
                 .compactMap({ $0 as? UIWindowScene }).first?.keyWindow?.rootViewController else { return }
         isBusy = true
@@ -101,7 +106,7 @@ struct SignInView: View {
             await app.refreshAccount()
             dismiss()
         } catch {
-            app.lastError = error.localizedDescription
+            show(error)
         }
     }
 
@@ -122,8 +127,18 @@ struct SignInView: View {
                 await app.refreshAccount()
                 dismiss()
             } catch {
-                app.lastError = error.localizedDescription
+                show(error)
             }
+        }
+    }
+
+    /// 接続先の設定もれは英語のまま出ると原因が分からないため、言い換えて示す
+    private func show(_ error: Error) {
+        let m = error.localizedDescription
+        if m.contains("is not enabled") {
+            app.lastError = "ログイン方法がサーバー側で有効になっていません（Supabase の Authentication → Providers で有効化が必要です）。\n" + m
+        } else {
+            app.lastError = m
         }
     }
 
