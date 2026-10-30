@@ -107,11 +107,16 @@ struct RoadDetailView: View {
                 .frame(height: 190).frame(maxWidth: .infinity).clipped()
                 .overlay(alignment: .bottomLeading) {
                     LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .center, endPoint: .bottom)
-                    if let top = videos.first, road.coverPath == nil {
-                        Text(top.channel.map { "▶ \($0)" } ?? "▶ YouTube").font(.system(size: 10, weight: .semibold)).foregroundStyle(.white.opacity(0.85)).padding(10)
+                    if case .video(_, let v) = heroContent {
+                        Text(v.channel.map { "▶ \($0)" } ?? "▶ YouTube").font(.system(size: 10, weight: .semibold)).foregroundStyle(.white.opacity(0.85)).padding(10)
                     }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                // 動画のサムネイルを出しているときは、押したらその動画へ
+                .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .onTapGesture {
+                    if case .video(_, let v) = heroContent, let u = v.playURL { UIApplication.shared.open(u) }
+                }
             }
             Map(initialPosition: .region(region)) {
                 MapPolyline(coordinates: road.coordinates).stroke(ZK.color(for: road).opacity(0.35), lineWidth: 14)
@@ -216,14 +221,23 @@ struct RoadDetailView: View {
             .overlay(Circle().stroke(.black.opacity(0.5), lineWidth: 1))
     }
 
-    private var heroImageURL: URL? {
-        if let cover = road.coverPath, let u = app.backend.publicURL(bucket: MediaKind.photo.bucket, path: cover) { return u }
+    /// ヒーローに何を出しているか。動画のサムネイルのときは、押して YouTube へ渡せるよう動画も持つ
+    private enum Hero {
+        case photo(URL)
+        case video(URL, RoadVideo)
+        var url: URL { switch self { case .photo(let u): return u; case .video(let u, _): return u } }
+    }
+
+    private var heroContent: Hero? {
+        if let cover = road.coverPath, let u = app.backend.publicURL(bucket: MediaKind.photo.bucket, path: cover) { return .photo(u) }
         // スポットに本物の写真が 2 枚以上あるときだけ、展望台を優先してヒーローに使う（1 枚だけならカード側に残す）
         let real = spots.filter(\.hasRealPhoto)
-        if real.count >= 2, let sp = real.first(where: { $0.kind == "viewpoint" }) ?? real.first, let u = sp.photoURL { return u }
-        if let top = videos.first { return URL(string: "https://i.ytimg.com/vi/\(top.videoId)/hqdefault.jpg") }
+        if real.count >= 2, let sp = real.first(where: { $0.kind == "viewpoint" }) ?? real.first, let u = sp.photoURL { return .photo(u) }
+        if let top = videos.first, let u = URL(string: "https://i.ytimg.com/vi/\(top.videoId)/hqdefault.jpg") { return .video(u, top) }
         return nil
     }
+
+    private var heroImageURL: URL? { heroContent?.url }
 
     private var region: MKCoordinateRegion {
         let c = GeoUtils.center(of: road.coordinates) ?? CLLocationCoordinate2D(latitude: 36, longitude: 138)

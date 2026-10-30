@@ -316,11 +316,18 @@ struct RoadSpot: Codable, Identifiable, Hashable {
         default: return "mappin"
         }
     }
-    /// Google マップでこの場所を開く
+    /// Google マップでこの場所を開く。
+    /// 緯度経度だけを渡すと Google マップ側に座標が表示されてしまうため、場所の名前を含む
+    /// place 形式で開き、座標で地図の中心を指定して同名の別の場所に飛ぶのを防ぐ
     var googleMapsURL: URL? {
-        var c = URLComponents(string: "https://www.google.com/maps/search/")!
-        c.queryItems = [URLQueryItem(name: "api", value: "1"), URLQueryItem(name: "query", value: String(format: "%.5f,%.5f", lat, lng))]
-        return c.url
+        let coord = String(format: "%.6f,%.6f", lat, lng)
+        let byCoordinate = URL(string: "https://www.google.com/maps/search/?api=1&query=\(coord)")
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .alphanumerics),
+              let url = URL(string: "https://www.google.com/maps/place/\(encoded)/@\(coord),16z")
+        else { return byCoordinate }
+        return url
     }
 }
 
