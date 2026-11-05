@@ -121,7 +121,15 @@ struct RoadDetailView: View {
                 .overlay(alignment: .bottomLeading) {
                     LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .center, endPoint: .bottom)
                     if case .video(_, let v) = heroContent {
-                        Text(v.channel.map { "▶ \($0)" } ?? "▶ YouTube").font(.system(size: 10, weight: .semibold)).foregroundStyle(.white.opacity(0.85)).padding(10)
+                        // 押せば動画へ飛ぶと分かるよう、YouTube の記号を立てる
+                        HStack(spacing: 7) {
+                            Image(systemName: "play.fill").font(.system(size: 11, weight: .black)).foregroundStyle(.white)
+                                .frame(width: 30, height: 21)
+                                .background(Color(hex: 0xFF0000), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                            Text(v.channel ?? "YouTube で見る").font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.white).lineLimit(1)
+                        }
+                        .padding(10)
                     }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -149,7 +157,7 @@ struct RoadDetailView: View {
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(ZK.border, lineWidth: 1))
             .overlay(alignment: .bottomTrailing) {
-                Label(unlocked ? "Google マップでナビ" : "閲覧枠を使うとナビできます",
+                Label(unlocked ? "Google マップでナビ" : "閲覧枠を使うと地図アプリへ渡せます",
                       systemImage: unlocked ? "arrow.up.right.square" : "lock.fill")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(unlocked ? .white : Color.white.opacity(0.65))
@@ -330,7 +338,7 @@ struct RoadDetailView: View {
                 .disabled(app.creditBalance <= 0)
                 Text("評価の内訳・立ち寄りスポットの場所・Google マップへのナビが見られます。\n絶景道を投稿すると閲覧枠が増えます。月額プランなら無制限です。")
                     .font(.system(size: 11)).foregroundStyle(ZK.caption).multilineTextAlignment(.center)
-                Button("月額プランを見る") {}.font(.system(size: 13, weight: .semibold)).foregroundStyle(ZK.accent)
+                Text("月額プランはベータ公開の後に提供予定").font(.system(size: 11)).foregroundStyle(ZK.disabled)
             } else {
                 Button("ログインして見る") { showSignIn = true }.buttonStyle(PrimaryButtonStyle())
             }
@@ -468,7 +476,11 @@ struct RoadDetailView: View {
     }
 
     private func openNavigation(_ origin: ZekkeiRoad.RouteOrigin) {
-        guard let url = road.googleMapsRouteURL(from: origin) else { return }
+        // Google マップが入っていなければ Safari の案内ページに落ちるため、
+        // その場合は Apple マップに渡す（経由地は 1 か所までだが、ナビは始められる）
+        let hasGoogleMaps = URL(string: "comgooglemaps://").map { UIApplication.shared.canOpenURL($0) } ?? false
+        let url = hasGoogleMaps ? road.googleMapsRouteURL(from: origin) : road.appleMapsRouteURL(from: origin)
+        guard let url else { return }
         UIApplication.shared.open(url)
     }
 }

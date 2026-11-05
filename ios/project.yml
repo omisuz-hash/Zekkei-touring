@@ -64,6 +64,8 @@ targets:
             LSHandlerRank: Alternate
             CFBundleTypeRole: Viewer
             LSItemContentTypes: [com.topografix.gpx, com.garmin.tcx, com.google.earth.kml]
+        # Google マップが入っているかを調べるために必要（入っていなければ Apple マップに渡す）
+        LSApplicationQueriesSchemes: [comgooglemaps]
         # Google ログインのコールバック用 URL スキーム（Local.xcconfig の GOOGLE_REVERSED_CLIENT_ID）
         CFBundleURLTypes:
           - CFBundleURLSchemes: [$(GOOGLE_REVERSED_CLIENT_ID)]

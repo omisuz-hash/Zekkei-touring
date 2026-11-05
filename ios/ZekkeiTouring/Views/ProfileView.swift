@@ -90,11 +90,12 @@ struct ProfileView: View {
                         }
                         .padding(16)
                         Divider().overlay(ZK.divider)
+                        // 月額プランはベータ公開の後。押せそうに見せない
                         HStack {
-                            Text("月額プランを見る").font(.system(size: 15, weight: .bold)).foregroundStyle(ZK.accent)
-                            Text("無制限 · 380 円/月").font(.system(size: 12)).foregroundStyle(ZK.caption)
+                            Text("月額プラン").font(.system(size: 15, weight: .bold)).foregroundStyle(ZK.disabled)
+                            Text("無制限 · 380 円/月（予定）").font(.system(size: 12)).foregroundStyle(ZK.caption)
                             Spacer()
-                            Image(systemName: "chevron.right").foregroundStyle(ZK.caption)
+                            Text("準備中").font(.system(size: 11, weight: .semibold)).foregroundStyle(ZK.caption)
                         }
                         .padding(16)
                     }

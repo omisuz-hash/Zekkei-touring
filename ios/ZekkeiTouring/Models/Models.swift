@@ -144,6 +144,25 @@ struct ZekkeiRoad: Codable, Identifiable, Hashable {
         case reversed
     }
 
+    /// Google マップが入っていないときに渡す Apple マップの経路。
+    /// 経由地は 1 か所までしか扱えないため、道の中ほどを 1 つだけ渡す
+    func appleMapsRouteURL(from origin: RouteOrigin = .currentLocation) -> URL? {
+        let pts = origin == .reversed ? coordinates.reversed().map { $0 } : coordinates
+        guard let s = pts.first, let e = pts.last, pts.count >= 2 else { return nil }
+        let f = { (c: CLLocationCoordinate2D) in String(format: "%.5f,%.5f", c.latitude, c.longitude) }
+        var items = [URLQueryItem(name: "dirflg", value: "d")]
+        if origin == .currentLocation {
+            items.append(URLQueryItem(name: "saddr", value: ""))   // 空は現在地
+            items.append(URLQueryItem(name: "daddr", value: "\(f(s))+to:\(f(e))"))
+        } else {
+            items.append(URLQueryItem(name: "saddr", value: f(s)))
+            items.append(URLQueryItem(name: "daddr", value: "\(f(pts[pts.count / 2]))+to:\(f(e))"))
+        }
+        var comps = URLComponents(string: "https://maps.apple.com/")!
+        comps.queryItems = items
+        return comps.url
+    }
+
     func googleMapsRouteURL(from origin: RouteOrigin = .currentLocation) -> URL? {
         let pts = origin == .reversed ? coordinates.reversed().map { $0 } : coordinates
         guard let s = pts.first, let e = pts.last, pts.count >= 2 else { return nil }
