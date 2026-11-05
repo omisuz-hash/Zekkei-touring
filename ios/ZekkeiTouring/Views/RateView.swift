@@ -154,6 +154,12 @@ struct RateView: View {
                 target = try await app.backend.createRoad(draft)
             }
             guard let road = target else { return }
+            // 同じ走行から同じ道へ二重に投稿しない（データベース側にも制約はあるが、
+            // ここで止めた方が何が起きたか分かる）
+            if ride.publishedRoadIds.contains(road.id) {
+                app.lastError = "この走行からは、すでに「\(road.name)」へ投稿しています。別の区間を選んでください。"
+                return
+            }
             let seasonText = seasonOptions.filter { seasons.contains($0) }.joined(separator: "・")
             let rating = RoadRating(
                 roadId: road.id, userId: userId, rideLogId: ride.id,
@@ -178,7 +184,12 @@ struct RateView: View {
             await app.refreshAccount()
             done = true
         } catch {
-            app.lastError = error.localizedDescription
+            let m = error.localizedDescription
+            if m.contains("road_ratings_road_id_user_id_ride_log_id_key") || m.contains("duplicate key") {
+                app.lastError = "この走行からは、すでにこの道へ投稿しています。別の区間を選んでください。"
+            } else {
+                app.lastError = m
+            }
         }
     }
 }

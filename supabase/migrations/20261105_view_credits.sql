@@ -14,6 +14,9 @@
 --   2. 残枠を読むときに、その月の無料枠がまだなら自動で配る。定期実行の仕組みに
 --      頼らずに済む。
 --   3. 念のため、表示する残枠は 0 を下回らないようにする。
+--
+-- あわせて、月次の無料枠を 3 から 10 に引き上げる。3 枠だと道を 3 本見ただけで
+-- 止まってしまい、投稿するには走行記録が要るため、使い始めの人が詰まる。
 
 -- ---------------------------------------------------------------
 -- その月の無料枠をまだ配っていなければ配る
@@ -30,7 +33,7 @@ begin
       and created_at >= date_trunc('month', now())
   ) and exists (select 1 from public.profiles where id = p_user_id) then
     insert into public.view_credits(user_id, kind, amount, expires_at)
-    values (p_user_id, 'monthly_free', 3, date_trunc('month', now()) + interval '1 month');
+    values (p_user_id, 'monthly_free', 10, date_trunc('month', now()) + interval '1 month');
   end if;
 end;
 $$;
@@ -139,3 +142,30 @@ revoke execute on function public.unlock_road(uuid) from public, anon;
 grant execute on function public.my_credit_balance() to authenticated;
 grant execute on function public.credit_balance(uuid) to authenticated;
 grant execute on function public.unlock_road(uuid) to authenticated;
+
+-- ---------------------------------------------------------------
+-- 登録時の付与と、一括付与も 10 に揃える
+-- ---------------------------------------------------------------
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.profiles(id, display_name)
+  values (new.id, public.random_rider_name())
+  on conflict (id) do nothing;
+  insert into public.view_credits(user_id, kind, amount, expires_at)
+  values (new.id, 'monthly_free', 10, date_trunc('month', now()) + interval '1 month');
+  return new;
+end;
+$$;
+
+create or replace function public.grant_monthly_free_credits()
+returns void language sql security definer set search_path = public as $$
+  insert into public.view_credits(user_id, kind, amount, expires_at)
+  select id, 'monthly_free', 10, date_trunc('month', now()) + interval '1 month'
+  from public.profiles
+  where not exists (
+    select 1 from public.view_credits v
+    where v.user_id = profiles.id and v.kind = 'monthly_free'
+      and v.created_at >= date_trunc('month', now())
+  );
+$$;
