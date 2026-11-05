@@ -2,8 +2,9 @@
 
 アプリから参照する対外ページの元データ。tidalworks.jp に設置する。
 
-| ファイル | 設置先の URL | アプリからの参照元 |
+| ファイル | 設置先の URL | 用途 |
 |---|---|---|
+| `index.html` | `https://tidalworks.jp/zekkeido/` | アプリの紹介。App Store Connect のサポート URL / マーケティング URL |
 | `terms.html` | `https://tidalworks.jp/zekkeido/terms` | ログイン画面の「利用規約」 |
 | `privacy.html` | `https://tidalworks.jp/zekkeido/privacy` | ログイン画面の「プライバシーポリシー」、App Store Connect の必須項目 |
 
@@ -11,10 +12,20 @@
 
 ## 設置のしかた
 
-拡張子なしの URL（`/zekkeido/terms`）で開けるようにする。サーバーの作りに応じて次のいずれか。
+tidalworks.jp は WordPress で動いているため、WordPress の書き換え規則より先に
+実体のファイルが返るよう、**フォルダを作って `index.html` として置く**。
 
-- `zekkeido/terms/index.html` として置く
-- `zekkeido/terms.html` として置き、拡張子なしでも引けるよう設定する
+```
+public_html/
+  zekkeido/
+    index.html            → https://tidalworks.jp/zekkeido/
+    terms/index.html      → https://tidalworks.jp/zekkeido/terms
+    privacy/index.html    → https://tidalworks.jp/zekkeido/privacy
+```
+
+WordPress の `.htaccess` は「実体のファイルまたはフォルダが無いとき」だけ
+`index.php` に流す作りになっている。実体のフォルダを置けばそちらが優先されるため、
+WordPress 側の設定変更は要らない。
 
 ファイル名は設置先の URL になるため、日付を頭に付けていない。
 
