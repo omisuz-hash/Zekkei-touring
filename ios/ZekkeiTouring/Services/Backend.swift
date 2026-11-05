@@ -23,6 +23,9 @@ protocol Backend: AnyObject {
     func road(id: UUID) async throws -> ZekkeiRoad?
     func findOverlappingRoad(ewkt: String, minRatio: Double) async throws -> OverlapMatch?
     func createRoad(_ draft: RoadDraft) async throws -> ZekkeiRoad
+    /// 評価が参照する走行記録の枠をサーバーに用意する。
+    /// 走った時刻と距離だけを置き、経路そのものは端末に残す
+    func ensureRideLog(id: UUID, startedAt: Date, endedAt: Date?, distanceMeters: Double) async throws
     func submitRating(_ rating: RoadRating) async throws
     func ratings(for roadId: UUID) async throws -> [RoadRating]
     func videos(for roadId: UUID) async throws -> [RoadVideo]
@@ -124,6 +127,8 @@ final class MockBackend: Backend {
         roads.append(road)
         return road
     }
+
+    func ensureRideLog(id: UUID, startedAt: Date, endedAt: Date?, distanceMeters: Double) async throws {}
 
     func submitRating(_ rating: RoadRating) async throws {
         ratingsByRoad[rating.roadId, default: []].append(rating)

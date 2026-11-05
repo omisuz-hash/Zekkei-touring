@@ -162,6 +162,9 @@ struct RateView: View {
                 traffic: traffic == 0 ? nil : traffic, season: seasonText.isEmpty ? nil : seasonText,
                 comment: comment.isEmpty ? nil : comment,
                 videoUrl: validatedVideoURL, riddenAt: ride.startedAt)
+            // 評価は走行記録を参照するので、先にその枠を用意する（経路は送らない）
+            try await app.backend.ensureRideLog(id: ride.id, startedAt: ride.startedAt,
+                                                endedAt: ride.endedAt, distanceMeters: ride.distanceMeters)
             try await app.backend.submitRating(rating)
             var failed = 0
             for m in pending {

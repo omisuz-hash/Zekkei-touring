@@ -121,6 +121,26 @@ final class SupabaseBackend: Backend {
         try await client.from("zekkei_roads").insert(draft).select().single().execute().value
     }
 
+    private struct RideLogRow: Encodable {
+        let id: UUID
+        let user_id: UUID
+        let started_at: Date
+        let ended_at: Date?
+        let distance_m: Double
+    }
+
+    /// 評価は走行記録を参照するため、先にその行を用意しておく。
+    /// 経路（track / raw_points）は送らない。自宅を含む軌跡は端末から出さない方針のため、
+    /// サーバーには「いつ・どれだけ走ったか」だけが残る
+    func ensureRideLog(id: UUID, startedAt: Date, endedAt: Date?, distanceMeters: Double) async throws {
+        let uid = try requireUser()
+        try await client.from("ride_logs")
+            .upsert(RideLogRow(id: id, user_id: uid, started_at: startedAt, ended_at: endedAt,
+                               distance_m: distanceMeters),
+                    onConflict: "id", ignoreDuplicates: true)
+            .execute()
+    }
+
     func submitRating(_ rating: RoadRating) async throws {
         try await client.from("road_ratings").insert(rating).execute()
     }
