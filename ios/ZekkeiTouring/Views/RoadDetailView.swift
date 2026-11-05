@@ -22,6 +22,7 @@ struct RoadDetailView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
+                // 子の 1 つが幅を押し広げても画面からはみ出さないようにする
                 VStack(alignment: .leading, spacing: 16) {
                     hero
                     header
@@ -48,6 +49,7 @@ struct RoadDetailView: View {
                         Text("上に引き上げると全体が見えます").font(.system(size: 11)).foregroundStyle(ZK.disabled).frame(maxWidth: .infinity)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 18).padding(.top, 8).padding(.bottom, 24)
             }
             .toolbar {
@@ -336,11 +338,21 @@ struct RoadDetailView: View {
         .padding(.top, 4)
     }
 
+    /// 注意事項。動画ごとの記述が「/」で連結されているため（言及の多い道では 100 件を超える）、
+    /// 重複を除いて先頭の数件だけ出す。読点では切らない。文の途中で切れてしまうため
     private var cautions: [String] {
         guard let d = road.description else { return [] }
-        return d.split(separator: "\n").filter { $0.hasPrefix("注意") }
-            .flatMap { $0.dropFirst(2).trimmingCharacters(in: CharacterSet(charactersIn: ": ：")).components(separatedBy: CharacterSet(charactersIn: "/、・")) }
-            .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let raw = d.split(separator: "\n").filter { $0.hasPrefix("注意") }
+            .flatMap { $0.dropFirst(2).trimmingCharacters(in: CharacterSet(charactersIn: ": ：")).components(separatedBy: "/") }
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        var seen = Set<String>()
+        var out: [String] = []
+        for c in raw where seen.insert(c).inserted {
+            out.append(c)
+            if out.count >= 3 { break }
+        }
+        return out
     }
 
     private var bodyText: String {
@@ -355,9 +367,18 @@ struct RoadDetailView: View {
             }
         }
         if !cautions.isEmpty {
-            HStack(spacing: 6) {
-                ForEach(cautions, id: \.self) { c in CautionTag(text: c, filled: c.contains("閉鎖") || c.contains("通行止")) }
+            VStack(alignment: .leading, spacing: 6) {
+                CaptionLabel(text: "注意")
+                ForEach(cautions, id: \.self) { c in
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 10)).foregroundStyle(ZK.accent).padding(.top, 2)
+                        Text(c).font(.system(size: 12)).lineSpacing(4).foregroundStyle(ZK.body)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         if !bodyText.isEmpty {
             Text(bodyText).font(.system(size: 13)).lineSpacing(6).foregroundStyle(ZK.body)
