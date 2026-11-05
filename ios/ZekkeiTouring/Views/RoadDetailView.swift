@@ -26,7 +26,9 @@ struct RoadDetailView: View {
                     hero
                     header
                     routeRow
-                    if !spots.isEmpty { spotSection }
+                    if !spots.isEmpty {
+                        if unlocked { spotSection } else { spotTeaser }
+                    }
                     HStack(spacing: 8) {
                         StatTile(caption: "スコア", value: road.overallScore.map { String(format: "%.1f", $0) } ?? "–",
                                  note: road.ratingCount > 0 ? "\(road.ratingCount) 件" : (road.isProvisional ? "動画から推定" : "評価待ち"), valueColor: ZK.highlight)
@@ -132,7 +134,8 @@ struct RoadDetailView: View {
                 MapPolyline(coordinates: road.coordinates).stroke(ZK.color(for: road), lineWidth: 5)
                 if let s = road.coordinates.first { Annotation("", coordinate: s) { pin("S") } }
                 if let e = road.coordinates.last { Annotation("", coordinate: e) { pin("E") } }
-                ForEach(spots) { sp in
+                // スポットの位置も閲覧枠の対象。解放前は地図にも出さない
+                ForEach(unlocked ? spots : []) { sp in
                     Annotation(sp.name, coordinate: sp.coordinate, anchor: .bottom) { spotPin(sp) }
                         .annotationTitles(.hidden)
                 }
@@ -144,12 +147,14 @@ struct RoadDetailView: View {
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(ZK.border, lineWidth: 1))
             .overlay(alignment: .bottomTrailing) {
-                Label("Google マップでナビ", systemImage: "arrow.up.right.square")
-                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
+                Label(unlocked ? "Google マップでナビ" : "閲覧枠を使うとナビできます",
+                      systemImage: unlocked ? "arrow.up.right.square" : "lock.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(unlocked ? .white : Color.white.opacity(0.65))
                     .padding(.horizontal, 10).padding(.vertical, 6).glassPill(radius: 999).padding(8)
             }
             .contentShape(Rectangle())
-            .onTapGesture { showNavOptions = true }
+            .onTapGesture { if unlocked { showNavOptions = true } }
         }
     }
 
@@ -164,6 +169,21 @@ struct RoadDetailView: View {
     }
 
     /// 立ち寄りスポット: タップで Google マップにその場所を表示
+    /// 枠を使う前のスポット。何件あるかだけ伝え、場所は見せない
+    private var spotTeaser: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "mappin.and.ellipse").font(.system(size: 15)).foregroundStyle(ZK.accent)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("立ち寄りスポット \(spots.count) 件").font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                Text("展望台・飲食店・道の駅など。閲覧枠を使うと場所と地図への案内が見られます")
+                    .font(.system(size: 11)).foregroundStyle(ZK.caption)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "lock.fill").font(.system(size: 12)).foregroundStyle(ZK.caption)
+        }
+        .padding(12).innerGroup(radius: 12)
+    }
+
     private var spotSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -306,7 +326,7 @@ struct RoadDetailView: View {
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(app.creditBalance <= 0)
-                Text("絶景道を投稿すると閲覧枠が増えます。月額プランなら無制限です。")
+                Text("評価の内訳・立ち寄りスポットの場所・Google マップへのナビが見られます。\n絶景道を投稿すると閲覧枠が増えます。月額プランなら無制限です。")
                     .font(.system(size: 11)).foregroundStyle(ZK.caption).multilineTextAlignment(.center)
                 Button("月額プランを見る") {}.font(.system(size: 13, weight: .semibold)).foregroundStyle(ZK.accent)
             } else {
