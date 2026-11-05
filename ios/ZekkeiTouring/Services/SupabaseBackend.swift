@@ -163,8 +163,9 @@ final class SupabaseBackend: Backend {
     // MARK: 閲覧枠
 
     func creditBalance() async throws -> Int {
-        let id = try requireUser()
-        return try await client.rpc("credit_balance", params: ["p_user_id": id.uuidString]).execute().value
+        _ = try requireUser()
+        // 読むついでに、その月の無料枠がまだなら配られる
+        return try await client.rpc("my_credit_balance").execute().value
     }
 
     private struct UnlockRow: Decodable {
