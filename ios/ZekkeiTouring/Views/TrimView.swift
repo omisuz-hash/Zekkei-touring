@@ -7,14 +7,36 @@ struct TrimView: View {
     @Environment(\.dismiss) private var dismiss
     let ride: RideLog
 
-    @State private var startIndex: Double = 0
-    @State private var endIndex: Double = 0
+    // 位置は「走り始めてから何 km か」で持つ。点の番号で持つと、記録の密度
+    // （5m ごと）に左右されて長い走行ほど動かしづらくなる
+    @State private var startKm: Double = 0
+    @State private var endKm: Double = 0
     @State private var cumulative: [Double] = []
     @State private var goRate = false
 
+    /// 微調整の 1 段階
+    private static let stepKm = 0.05
+
     private var coords: [CLLocationCoordinate2D] { ride.coordinates }
-    private var lower: Int { min(Int(startIndex), Int(endIndex)) }
-    private var upper: Int { max(max(Int(startIndex), Int(endIndex)), lower + 1) }
+    private var totalKm: Double { (cumulative.last ?? 0) / 1000 }
+
+    /// 走り始めてからの距離に最も近い点の番号
+    private func index(forKm km: Double) -> Int {
+        guard cumulative.count > 1 else { return 0 }
+        let target = km * 1000
+        var lo = 0, hi = cumulative.count - 1
+        while lo < hi {
+            let mid = (lo + hi) / 2
+            if cumulative[mid] < target { lo = mid + 1 } else { hi = mid }
+        }
+        return lo
+    }
+
+    private var lower: Int { min(index(forKm: startKm), index(forKm: endKm)) }
+    private var upper: Int {
+        let u = max(index(forKm: startKm), index(forKm: endKm))
+        return min(max(u, lower + 1), max(coords.count - 1, 0))
+    }
     private var segment: [CLLocationCoordinate2D] {
         guard coords.count > 1, upper < coords.count else { return [] }
         return Array(coords[lower...upper])
@@ -65,8 +87,8 @@ struct TrimView: View {
         .onAppear {
             cumulative = GeoUtils.cumulativeDistances(coords)
             let r = GeoUtils.privacyClippedRange(coords, center: app.privacyCenter, radiusMeters: app.privacyRadiusMeters)
-            startIndex = Double(r.lowerBound)
-            endIndex = Double(max(r.upperBound, r.lowerBound + 1))
+            startKm = (cumulative[safe: r.lowerBound] ?? 0) / 1000
+            endKm = (cumulative[safe: r.upperBound] ?? cumulative.last ?? 0) / 1000
         }
         .preferredColorScheme(.dark)
     }
@@ -75,11 +97,16 @@ struct TrimView: View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("公開する区間を選ぶ").font(.system(size: 19, weight: .bold)).foregroundStyle(.white)
-                Text("自宅周辺（プライバシーゾーン）は自動で除外されています").font(.system(size: 12)).foregroundStyle(ZK.caption)
+                if app.privacyCenter != nil {
+                    Text("自宅周辺（プライバシーゾーン）は自動で除外されています").font(.system(size: 12)).foregroundStyle(ZK.caption)
+                } else {
+                    Text("自宅周辺を伏せる設定は未設定です。設定しておくと、この画面で自動的に除かれます")
+                        .font(.system(size: 12)).foregroundStyle(ZK.errorText)
+                }
             }
             if coords.count > 1 {
-                sliderRow("始点", $startIndex, km(cumulative[safe: lower]))
-                sliderRow("終点", $endIndex, km(cumulative[safe: upper]))
+                sliderRow("始点", $startKm)
+                sliderRow("終点", $endKm)
                 HStack(spacing: 8) {
                     StatTile(caption: "選択区間", value: String(format: "%.1f", segmentLengthM / 1000), unit: "km", valueColor: ZK.highlight, valueSize: 24)
                     StatTile(caption: "曲がり具合", value: String(format: "%.0f", GeoUtils.curviness(of: segment) * 100), unit: "%", valueSize: 24)
@@ -95,14 +122,28 @@ struct TrimView: View {
         .glassCard(radius: 22, padding: EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
     }
 
-    private func sliderRow(_ label: String, _ value: Binding<Double>, _ text: String) -> some View {
-        HStack(spacing: 12) {
+    private func sliderRow(_ label: String, _ value: Binding<Double>) -> some View {
+        HStack(spacing: 8) {
             Text(label).font(.system(size: 9, weight: .bold)).foregroundStyle(.white)
                 .frame(width: 34, height: 24).background(ZK.tagBg).clipShape(RoundedRectangle(cornerRadius: 5))
                 .overlay(RoundedRectangle(cornerRadius: 5).stroke(ZK.accent, lineWidth: 1))
-            Slider(value: value, in: 0...Double(max(1, coords.count - 1)), step: 1).tint(.white)
-            Text(text).font(.zkNumber(15)).foregroundStyle(.white).frame(width: 64, alignment: .trailing)
+            Slider(value: value, in: 0...max(Self.stepKm, totalKm), step: Self.stepKm).tint(.white)
+            // 長い走行では指先の 1 ミリが数百 m に相当するため、50 m ずつの微調整を添える
+            nudge("minus") { value.wrappedValue = max(0, value.wrappedValue - Self.stepKm) }
+            nudge("plus") { value.wrappedValue = min(totalKm, value.wrappedValue + Self.stepKm) }
+            Text(String(format: "%.2f km", value.wrappedValue))
+                .font(.zkNumber(14)).foregroundStyle(.white).frame(width: 66, alignment: .trailing)
         }
+    }
+
+    private func nudge(_ symbol: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.system(size: 11, weight: .bold)).foregroundStyle(.white)
+                .frame(width: 28, height: 28).background(ZK.tagBg)
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+                .overlay(RoundedRectangle(cornerRadius: 7).stroke(ZK.border, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     private var region: MKCoordinateRegion {
@@ -113,7 +154,6 @@ struct TrimView: View {
             longitudeDelta: max(0.02, ((lngs.max() ?? 0) - (lngs.min() ?? 0)) * 1.3)))
     }
 
-    private func km(_ m: Double?) -> String { String(format: "%.1f km", (m ?? 0) / 1000) }
     private func durationText(_ t: TimeInterval) -> String { let s = Int(t); return String(format: "%d:%02d", s / 3600, (s % 3600) / 60) }
 }
 
