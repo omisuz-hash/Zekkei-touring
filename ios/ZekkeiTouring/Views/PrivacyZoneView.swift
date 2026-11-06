@@ -3,6 +3,7 @@ import SwiftUI
 /// プライバシーゾーン（自宅など伏せたい場所）の設定。マイページと取り込み時の案内で共用する
 struct PrivacyZoneCard: View {
     @EnvironmentObject private var app: AppState
+    @State private var isLocating = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -31,15 +32,11 @@ struct PrivacyZoneCard: View {
                 .padding(16)
                 Divider().overlay(ZK.divider)
                 HStack {
-                    Button("現在地を中心に設定") {
-                        if let l = app.recorder.lastLocation?.coordinate {
-                            app.privacyCenter = l
-                        } else {
-                            app.recorder.requestPermission()
-                            app.lastError = "現在地をまだ取得できていません。少し待ってからもう一度お試しください。"
-                        }
-                    }
-                    .font(.system(size: 15, weight: .bold)).foregroundStyle(ZK.accent)
+                    Button(isLocating ? "取得中…" : "現在地を中心に設定") { setFromCurrentLocation() }
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(isLocating ? ZK.caption : ZK.accent)
+                        .disabled(isLocating)
+                    if isLocating { ProgressView().tint(.white).scaleEffect(0.7) }
                     Spacer()
                     if app.privacyCenter != nil {
                         Button("解除") { app.privacyCenter = nil }.font(.system(size: 13)).foregroundStyle(ZK.errorText)
@@ -49,6 +46,25 @@ struct PrivacyZoneCard: View {
             }
             .innerGroup(radius: 16)
             Text("この範囲内の走行軌跡は、切り出し時に自動で除外されます").font(.system(size: 12)).foregroundStyle(ZK.caption)
+        }
+    }
+
+    /// 走行を記録していないときは位置が流れてこないため、1 度だけ取りに行く
+    private func setFromCurrentLocation() {
+        isLocating = true
+        Task {
+            let fix = await app.recorder.currentLocation()
+            isLocating = false
+            switch fix {
+            case .success(let l):
+                app.privacyCenter = l.coordinate
+            case .needsPermission:
+                app.lastError = "位置情報の利用を許可してから、もう一度お試しください。"
+            case .denied:
+                app.lastError = "位置情報の利用が許可されていません。iPhone の「設定」→「絶景道」→「位置情報」から許可してください。"
+            case .timedOut:
+                app.lastError = "現在地を取得できませんでした。屋外や窓際で、もう一度お試しください。"
+            }
         }
     }
 }

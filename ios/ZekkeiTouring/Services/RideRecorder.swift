@@ -26,6 +26,8 @@ final class RideRecorder: NSObject, ObservableObject {
 
     private let manager = CLLocationManager()
     private var lastMovementAt: Date?
+    /// 記録していないときに現在地を 1 度だけ取るための待ち合わせ
+    private var oneShot: CheckedContinuation<CLLocation?, Never>?
 
     override init() {
         super.init()
@@ -51,6 +53,56 @@ final class RideRecorder: NSObject, ObservableObject {
         default:
             break
         }
+    }
+
+    /// 現在地を 1 度だけ取る結果
+    enum LocationFix {
+        case success(CLLocation)
+        /// まだ許可していない（この呼び出しで許可を求めた）
+        case needsPermission
+        /// 許可されていない
+        case denied
+        /// 時間内に取得できなかった
+        case timedOut
+    }
+
+    /// 記録していないときに現在地を 1 度だけ取る（プライバシーゾーンの設定など）。
+    /// 走行の記録中は位置が流れてくるので、直近の位置をそのまま返す
+    func currentLocation(timeout: TimeInterval = 15) async -> LocationFix {
+        if let l = lastLocation, Date().timeIntervalSince(l.timestamp) < 120 {
+            return .success(l)
+        }
+        switch manager.authorizationStatus {
+        case .notDetermined:
+            manager.requestWhenInUseAuthorization()
+            return .needsPermission
+        case .denied, .restricted:
+            return .denied
+        default:
+            break
+        }
+        // 応答が無いまま待ち続けないよう時間を区切る
+        let limit = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            self?.finishOneShot(nil)
+        }
+        let got = await withCheckedContinuation { (c: CheckedContinuation<CLLocation?, Never>) in
+            finishOneShot(nil)        // 前回の待ちが残っていれば片付ける
+            oneShot = c
+            manager.requestLocation()
+        }
+        limit.cancel()
+        if let got {
+            lastLocation = got
+            return .success(got)
+        }
+        return .timedOut
+    }
+
+    private func finishOneShot(_ location: CLLocation?) {
+        guard let c = oneShot else { return }
+        oneShot = nil
+        c.resume(returning: location)
     }
 
     func start() {
@@ -106,6 +158,8 @@ extension RideRecorder: CLLocationManagerDelegate {
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         Task { @MainActor in
             for l in locations { self.append(l) }
+            // 1 度だけの取得では、精度が粗くても採用する（伏せる範囲は数百 m 単位のため）
+            if let last = locations.last { self.finishOneShot(last) }
         }
     }
 
@@ -115,6 +169,7 @@ extension RideRecorder: CLLocationManagerDelegate {
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        // 一時的な失敗は無視して記録を続ける
+        // 記録中の一時的な失敗は無視する。1 度だけの取得を待っている場合はそれを終える
+        Task { @MainActor in self.finishOneShot(nil) }
     }
 }
