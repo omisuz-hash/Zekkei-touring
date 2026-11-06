@@ -467,6 +467,16 @@ enum RatingAxis: String, CaseIterable, Identifiable {
     }
 }
 
+/// 評価と一緒に取る投稿者。読み出し専用で、保存時は送らない
+struct RatingAuthor: Codable, Hashable {
+    var displayName: String?
+    var avatarUrl: String?
+    enum CodingKeys: String, CodingKey {
+        case displayName = "display_name"
+        case avatarUrl = "avatar_url"
+    }
+}
+
 struct RoadRating: Codable, Identifiable, Hashable {
     var id: UUID = UUID()
     var roadId: UUID
@@ -485,6 +495,10 @@ struct RoadRating: Codable, Identifiable, Hashable {
     var videoUrl: String?
     var riddenAt: Date?
     var createdAt: Date?
+    /// 投稿者。読み出しのときだけ入る（Optional なので保存時は送られない）
+    var author: RatingAuthor?
+
+    var authorName: String { author?.displayName?.isEmpty == false ? author!.displayName! : "ライダー" }
 
     func score(for axis: RatingAxis) -> Int {
         switch axis {
@@ -510,6 +524,7 @@ struct RoadRating: Codable, Identifiable, Hashable {
         case videoUrl = "video_url"
         case riddenAt = "ridden_at"
         case createdAt = "created_at"
+        case author = "profiles"
     }
 }
 

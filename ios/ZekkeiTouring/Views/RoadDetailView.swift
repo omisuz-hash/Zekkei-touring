@@ -417,10 +417,11 @@ struct RoadDetailView: View {
             }
             ForEach(ratings) { r in
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("ライダー").font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
+                    HStack(spacing: 8) {
+                        AvatarView(path: r.author?.avatarUrl, name: r.authorName, size: 26)
+                        Text(r.authorName).font(.system(size: 12, weight: .bold)).foregroundStyle(.white).lineLimit(1)
                         Text(RatingAxis.allCases.map { "\(r.score(for: $0))" }.joined(separator: " · ")).font(.system(size: 12, weight: .semibold)).foregroundStyle(ZK.accent)
-                        Spacer()
+                        Spacer(minLength: 0)
                         if let s = r.season, !s.isEmpty { Text(s).font(.system(size: 10)).foregroundStyle(ZK.caption) }
                     }
                     if let c = r.comment, !c.isEmpty { Text(c).font(.system(size: 13)).lineSpacing(5).foregroundStyle(ZK.body) }

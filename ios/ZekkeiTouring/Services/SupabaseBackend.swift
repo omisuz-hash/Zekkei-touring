@@ -146,7 +146,8 @@ final class SupabaseBackend: Backend {
     }
 
     func ratings(for roadId: UUID) async throws -> [RoadRating] {
-        try await client.from("road_ratings").select()
+        // 投稿者のニックネームとアイコンを一緒に取る（profiles は誰でも参照できる）
+        try await client.from("road_ratings").select("*, profiles(display_name, avatar_url)")
             .eq("road_id", value: roadId.uuidString)
             .eq("status", value: "published")
             .order("created_at", ascending: false)
@@ -200,6 +201,13 @@ final class SupabaseBackend: Backend {
     }
 
     // MARK: 写真・動画
+
+    private struct AvatarParams: Encodable { let p_path: String? }
+
+    func setAvatarPath(_ path: String?) async throws {
+        _ = try requireUser()
+        _ = try await client.rpc("set_avatar_path", params: AvatarParams(p_path: path)).execute()
+    }
 
     func uploadMedia(data: Data, bucket: String, path: String, contentType: String) async throws {
         _ = try requireUser()

@@ -1,8 +1,11 @@
 import SwiftUI
+import PhotosUI
 import CoreLocation
 
 /// マイページ
 struct ProfileView: View {
+    @State private var avatarItem: PhotosPickerItem?
+    @State private var isUploadingAvatar = false
     @EnvironmentObject private var app: AppState
     @State private var navDetail: ZekkeiRoad.RouteDetail = .stored
     @State private var showSignIn = false
@@ -26,12 +29,8 @@ struct ProfileView: View {
                         if !app.isSignedIn { showSignIn = true }
                     } label: {
                         HStack(spacing: 14) {
-                            ZStack {
-                                Circle().fill(ZK.tagBg)
-                                Circle().stroke(ZK.accent, lineWidth: 1.2)
-                                Text(String((app.profile?.displayName ?? "？").prefix(1))).font(.system(size: 16, weight: .bold)).foregroundStyle(ZK.highlight)
-                            }
-                            .frame(width: 48, height: 48)
+                            AvatarView(path: app.profile?.avatarUrl,
+                                       name: app.profile?.displayName ?? "？", size: 48)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(app.isSignedIn ? (app.profile?.displayName ?? "ライダー") : "ログイン").font(.system(size: 17, weight: .bold)).foregroundStyle(.white)
                                 Text(app.isSignedIn ? (app.profile?.plan == .subscriber ? "月額プラン" : "投稿コース") : "Apple または Google で").font(.system(size: 13)).foregroundStyle(ZK.caption)
@@ -42,6 +41,30 @@ struct ProfileView: View {
                         .padding(16).innerGroup(radius: 16)
                     }
                     if app.isSignedIn {
+                        // 多くの人は自分のバイクの写真を目印にする
+                        PhotosPicker(selection: $avatarItem, matching: .images) {
+                            HStack(spacing: 10) {
+                                AvatarView(path: app.profile?.avatarUrl,
+                                           name: app.profile?.displayName ?? "？", size: 34)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("アイコン").font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+                                    Text(avatarNote).font(.system(size: 12)).foregroundStyle(ZK.caption)
+                                }
+                                Spacer()
+                                if isUploadingAvatar { ProgressView().tint(.white).scaleEffect(0.7) }
+                                else { Image(systemName: "chevron.right").foregroundStyle(ZK.caption) }
+                            }
+                            .padding(14).innerGroup(radius: 14)
+                        }
+                        .disabled(isUploadingAvatar)
+                        .onChange(of: avatarItem) { _, item in
+                            guard let item else { return }
+                            Task { await uploadAvatar(item) }
+                        }
+                        if app.profile?.avatarUrl?.isEmpty == false {
+                            Button("アイコンを外す") { Task { await clearAvatar() } }
+                                .font(.system(size: 12)).foregroundStyle(ZK.errorText)
+                        }
                         Button { showNickname = true } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: "person.text.rectangle").font(.system(size: 14)).foregroundStyle(ZK.accent)
@@ -178,5 +201,79 @@ struct ProfileView: View {
             HStack { Text(title).font(.system(size: 15)).foregroundStyle(.white); Spacer(); Image(systemName: "arrow.up.right").foregroundStyle(ZK.caption) }
                 .padding(16)
         }
+    }
+}
+
+extension ProfileView {
+    var avatarNote: String {
+        app.profile?.avatarUrl?.isEmpty == false ? "写真を選び直せます" : "自分のバイクの写真などを目印に"
+    }
+
+    func uploadAvatar(_ item: PhotosPickerItem) async {
+        isUploadingAvatar = true
+        defer { isUploadingAvatar = false; avatarItem = nil }
+        guard let uid = app.backend.currentUserId else { return }
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else {
+                app.lastError = "写真を読み込めませんでした。別の写真をお試しください。"
+                return
+            }
+            guard data.count <= 3 * 1024 * 1024 else {
+                app.lastError = "写真が大きすぎます（3 MB まで）。別の写真をお試しください。"
+                return
+            }
+            let path = "\(uid.uuidString)/\(UUID().uuidString).jpg"
+            try await app.backend.uploadMedia(data: data, bucket: "avatars", path: path, contentType: "image/jpeg")
+            try await app.backend.setAvatarPath(path)
+            await app.refreshAccount()
+        } catch {
+            app.lastError = error.localizedDescription
+        }
+    }
+
+    func clearAvatar() async {
+        do {
+            try await app.backend.setAvatarPath(nil)
+            await app.refreshAccount()
+        } catch {
+            app.lastError = error.localizedDescription
+        }
+    }
+}
+
+/// 利用者のアイコン。未設定ならニックネームの頭文字を出す
+struct AvatarView: View {
+    @EnvironmentObject private var app: AppState
+    let path: String?
+    let name: String
+    var size: CGFloat = 56
+
+    private var url: URL? {
+        guard let path, !path.isEmpty else { return nil }
+        return app.backend.publicURL(bucket: "avatars", path: path)
+    }
+
+    var body: some View {
+        ZStack {
+            Circle().fill(ZK.tagBg)
+            Circle().stroke(ZK.accent, lineWidth: 1.2)
+            if let url {
+                AsyncImage(url: url) { phase in
+                    if case .success(let img) = phase {
+                        img.resizable().scaledToFill()
+                    } else {
+                        Text(initial).font(.system(size: size * 0.42, weight: .bold)).foregroundStyle(ZK.highlight)
+                    }
+                }
+                .frame(width: size, height: size).clipShape(Circle())
+            } else {
+                Text(initial).font(.system(size: size * 0.42, weight: .bold)).foregroundStyle(ZK.highlight)
+            }
+        }
+        .frame(width: size, height: size)
+    }
+
+    private var initial: String {
+        String(name.trimmingCharacters(in: .whitespaces).prefix(1))
     }
 }

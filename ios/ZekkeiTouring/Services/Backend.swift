@@ -18,6 +18,8 @@ protocol Backend: AnyObject {
     /// ニックネームを変更する（2〜20 文字。URL やアカウント名は不可）
     func setDisplayName(_ name: String) async throws -> String
     func updatePrivacyZone(center: CLLocationCoordinate2D?, radiusMeters: Int) async throws
+    /// アイコンを設定する（保管場所の中の位置。nil で解除）
+    func setAvatarPath(_ path: String?) async throws
 
     func nearbyRoads(center: CLLocationCoordinate2D, radiusMeters: Double, limit: Int) async throws -> [ZekkeiRoad]
     func road(id: UUID) async throws -> ZekkeiRoad?
@@ -127,6 +129,8 @@ final class MockBackend: Backend {
         roads.append(road)
         return road
     }
+
+    func setAvatarPath(_ path: String?) async throws {}
 
     func ensureRideLog(id: UUID, startedAt: Date, endedAt: Date?, distanceMeters: Double) async throws {}
 
