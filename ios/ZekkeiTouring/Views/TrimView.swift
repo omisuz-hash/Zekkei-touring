@@ -79,6 +79,10 @@ struct TrimView: View {
 
             VStack {
                 Spacer()
+                // この走行から投稿した絶景道。どこへ投稿したのか後から辿れるようにする
+                if !ride.publishedRoadIds.isEmpty {
+                    publishedRoads.padding(.horizontal, 10).padding(.bottom, 6)
+                }
                 card.padding(.horizontal, 10).padding(.bottom, 10)
             }
         }
@@ -91,6 +95,35 @@ struct TrimView: View {
             endKm = (cumulative[safe: r.upperBound] ?? cumulative.last ?? 0) / 1000
         }
         .preferredColorScheme(.dark)
+    }
+
+    @State private var posted: [ZekkeiRoad] = []
+
+    private var publishedRoads: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            CaptionLabel(text: "この走行から投稿した絶景道 \(ride.publishedRoadIds.count)")
+            ForEach(posted) { r in
+                NavigationLink { RoadDetailView(road: r).environmentObject(app) } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.seal.fill").font(.system(size: 13)).foregroundStyle(ZK.highlight)
+                        Text(r.name).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
+                        Spacer(minLength: 0)
+                        Text(r.ratingCount > 0 ? "評価 \(r.ratingCount)" : "反映待ち")
+                            .font(.system(size: 11)).foregroundStyle(ZK.caption)
+                        Image(systemName: "chevron.right").font(.system(size: 11)).foregroundStyle(ZK.caption)
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 10)
+                }
+            }
+        }
+        .glassCard(radius: 18, padding: EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
+        .task(id: ride.publishedRoadIds) {
+            var out: [ZekkeiRoad] = []
+            for id in ride.publishedRoadIds {
+                if let r = try? await app.backend.road(id: id), let r { out.append(r) }
+            }
+            posted = out
+        }
     }
 
     private var card: some View {

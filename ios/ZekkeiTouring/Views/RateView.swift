@@ -20,6 +20,7 @@ struct RateView: View {
     @State private var videoURL = ""
     @State private var pending: [PendingMedia] = []
     @State private var uploadNote: String?
+    @State private var postedRoadName = ""
     @State private var isSubmitting = false
     @State private var overlap: (road: ZekkeiRoad, ratio: Double)?
     @State private var showOverlapChoice = false
@@ -104,7 +105,7 @@ struct RateView: View {
         }
         .sheet(isPresented: $showSignIn) { SignInView() }
         .sheet(isPresented: $done, onDismiss: { dismiss() }) {
-            DoneView(balance: app.creditBalance, note: uploadNote)
+            DoneView(balance: app.creditBalance, note: uploadNote, roadName: postedRoadName)
                 .presentationDetents([.medium])
                 .presentationBackground(ZK.bg)
         }
@@ -178,6 +179,7 @@ struct RateView: View {
                 catch { failed += 1 }
             }
             if failed > 0 { uploadNote = "写真・動画 \(failed) 件の送信に失敗しました" }
+            postedRoadName = road.name
             var updated = ride
             updated.publishedRoadIds.append(road.id)
             app.store.save(updated)
@@ -198,6 +200,8 @@ struct RateView: View {
 struct DoneView: View {
     let balance: Int
     let note: String?
+    /// どの絶景道に投稿したか。既存の道に紐づいた場合に分かるようにする
+    var roadName: String = ""
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         VStack(spacing: 14) {
@@ -208,6 +212,12 @@ struct DoneView: View {
             }
             .frame(width: 72, height: 72)
             Text("投稿しました").font(.system(size: 22, weight: .bold)).foregroundStyle(.white)
+            if !roadName.isEmpty {
+                Text("「\(roadName)」").font(.system(size: 14, weight: .semibold)).foregroundStyle(ZK.highlight)
+                    .multilineTextAlignment(.center)
+                Text("走行記録の一覧から、この道をいつでも開けます")
+                    .font(.system(size: 11)).foregroundStyle(ZK.caption)
+            }
             CaptionLabel(text: "閲覧枠の残り")
             Text("\(balance)").font(.zkNumber(48)).foregroundStyle(ZK.highlight)
             if let note { Text(note).font(.system(size: 12)).foregroundStyle(ZK.errorText) }
