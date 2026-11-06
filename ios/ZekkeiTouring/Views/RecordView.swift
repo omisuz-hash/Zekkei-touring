@@ -242,6 +242,8 @@ struct RideRow: View {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(ride.startedAt.formatted(.dateTime.year().month(.twoDigits).day(.twoDigits))).font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
                     Text(ride.startedAt.formatted(.dateTime.weekday(.abbreviated).locale(Locale(identifier: "ja_JP")))).font(.system(size: 11)).foregroundStyle(ZK.caption)
+                    // 同じ日に何本も記録すると日付だけでは見分けられないため、時刻を添える
+                    Text(clockRange).font(.zkNumber(12)).foregroundStyle(ZK.body)
                 }
                 Text(String(format: "%.1f km · %@", ride.distanceMeters / 1000, durationText(ride.duration))).font(.system(size: 12)).foregroundStyle(ZK.caption)
             }
@@ -254,6 +256,13 @@ struct RideRow: View {
         .padding(.horizontal, 14).padding(.vertical, 12)
         .innerGroup(radius: 16)
     }
+    /// 「14:32 〜 14:48」。終了時刻が無い場合は開始時刻だけ
+    private var clockRange: String {
+        let f = Date.FormatStyle(date: .omitted, time: .shortened).locale(Locale(identifier: "ja_JP"))
+        guard let end = ride.endedAt else { return ride.startedAt.formatted(f) }
+        return "\(ride.startedAt.formatted(f)) 〜 \(end.formatted(f))"
+    }
+
     private func durationText(_ t: TimeInterval) -> String {
         let s = Int(t); return String(format: "%d:%02d", s / 3600, (s % 3600) / 60)
     }
