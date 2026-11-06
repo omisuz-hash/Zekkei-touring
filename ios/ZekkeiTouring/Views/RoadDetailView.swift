@@ -89,6 +89,10 @@ struct RoadDetailView: View {
                 MediaViewer(media: m, url: app.backend.publicURL(bucket: m.bucket, path: m.storagePath))
             }
             .task { videos = (try? await app.backend.videos(for: road.id)) ?? [] }
+            // 評価が投稿されると集計が変わるため、開くたびに取り直す
+            .task {
+                if let fresh = try? await app.backend.road(id: road.id), let fresh { road = fresh }
+            }
             .task {
                 // 動画から抽出したスポットを先に出し、Apple の地図データで展望台・道の駅を補う
                 var fromVideos: [RoadSpot] = []
