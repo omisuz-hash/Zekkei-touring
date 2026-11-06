@@ -65,7 +65,8 @@ struct RoadDetailView: View {
             .confirmationDialog("どこから走り始めますか", isPresented: $showNavOptions, titleVisibility: .visible) {
                 Button("絶景道の始点から終点まで") { openNavigation(.roadStart) }
                 Button("現在地から（始点を経由して走り切る）") { openNavigation(.currentLocation) }
-                Button("逆向きに走る（終点から始点へ）") { openNavigation(.reversed) }
+                Button("逆向き：終点から始点まで") { openNavigation(.reversed) }
+                Button("逆向き：現在地から（終点を経由して走り切る）") { openNavigation(.reversedFromCurrent) }
                 Button("キャンセル", role: .cancel) {}
             } message: {
                 Text("「現在地から」を選ぶと、始点までの道のりと道中が 1 本の経路になります。\n"

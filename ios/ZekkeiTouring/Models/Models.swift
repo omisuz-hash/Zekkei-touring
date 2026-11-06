@@ -173,24 +173,32 @@ struct ZekkeiRoad: Codable, Identifiable, Hashable {
         }
     }
 
+    /// ナビに渡す経路の形。向き（順方向・逆方向）と、現在地から始めるかの組み合わせ
     enum RouteOrigin {
         /// 現在地から出発し、絶景道の始点を経由して終点まで。走り出す前に 1 度開けば、
         /// 始点までの道のりと道中が 1 本の経路としてつながる
         case currentLocation
         /// 絶景道の始点から終点まで。すでに始点の近くにいるとき向け
         case roadStart
+        /// 現在地から出発し、絶景道の終点を経由して始点まで（逆向きに走り切る）
+        case reversedFromCurrent
         /// 絶景道の終点から始点へ逆走
         case reversed
+
+        /// 道を逆からたどるか
+        var isReversed: Bool { self == .reversed || self == .reversedFromCurrent }
+        /// 出発地を現在地に任せるか
+        var startsAtCurrentLocation: Bool { self == .currentLocation || self == .reversedFromCurrent }
     }
 
     /// Google マップが入っていないときに渡す Apple マップの経路。
     /// 経由地は 1 か所までしか扱えないため、道の中ほどを 1 つだけ渡す
     func appleMapsRouteURL(from origin: RouteOrigin = .currentLocation) -> URL? {
-        let pts = origin == .reversed ? coordinates.reversed().map { $0 } : coordinates
+        let pts = origin.isReversed ? coordinates.reversed().map { $0 } : coordinates
         guard let s = pts.first, let e = pts.last, pts.count >= 2 else { return nil }
         let f = { (c: CLLocationCoordinate2D) in String(format: "%.5f,%.5f", c.latitude, c.longitude) }
         var items = [URLQueryItem(name: "dirflg", value: "d")]
-        if origin == .currentLocation {
+        if origin.startsAtCurrentLocation {
             items.append(URLQueryItem(name: "saddr", value: ""))   // 空は現在地
             items.append(URLQueryItem(name: "daddr", value: "\(f(s))+to:\(f(e))"))
         } else {
@@ -204,12 +212,12 @@ struct ZekkeiRoad: Codable, Identifiable, Hashable {
 
     func googleMapsRouteURL(from origin: RouteOrigin = .currentLocation,
                             detail: RouteDetail = .stored) -> URL? {
-        let pts = origin == .reversed ? coordinates.reversed().map { $0 } : coordinates
+        let pts = origin.isReversed ? coordinates.reversed().map { $0 } : coordinates
         guard let s = pts.first, let e = pts.last, pts.count >= 2 else { return nil }
         let f = { (c: CLLocationCoordinate2D) in String(format: "%.5f,%.5f", c.latitude, c.longitude) }
         // Google マップの URL が受け取れる経由地は 9 か所まで。現在地から始める場合は
-        // 始点自体も経由地として渡すため、その分を差し引く
-        let fromCurrent = origin == .currentLocation
+        // 走り始める端も経由地として渡すため、その分を差し引く
+        let fromCurrent = origin.startsAtCurrentLocation
         let maxVia = min(detail.waypointCount, fromCurrent ? 7 : 8)
         var waypoints: [String] = fromCurrent ? [f(s)] : []
         let n = min(maxVia, max(0, pts.count - 2))
