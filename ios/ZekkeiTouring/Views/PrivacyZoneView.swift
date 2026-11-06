@@ -1,9 +1,12 @@
 import SwiftUI
+import MapKit
+import CoreLocation
 
 /// プライバシーゾーン（自宅など伏せたい場所）の設定。マイページと取り込み時の案内で共用する
 struct PrivacyZoneCard: View {
     @EnvironmentObject private var app: AppState
     @State private var isLocating = false
+    @State private var showPicker = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -31,21 +34,35 @@ struct PrivacyZoneCard: View {
                 }
                 .padding(16)
                 Divider().overlay(ZK.divider)
-                HStack {
-                    Button(isLocating ? "取得中…" : "現在地を中心に設定") { setFromCurrentLocation() }
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(isLocating ? ZK.caption : ZK.accent)
-                        .disabled(isLocating)
-                    if isLocating { ProgressView().tint(.white).scaleEffect(0.7) }
-                    Spacer()
-                    if app.privacyCenter != nil {
-                        Button("解除") { app.privacyCenter = nil }.font(.system(size: 13)).foregroundStyle(ZK.errorText)
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Button(isLocating ? "取得中…" : "現在地を中心に設定") { setFromCurrentLocation() }
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(isLocating ? ZK.caption : ZK.accent)
+                            .disabled(isLocating)
+                        if isLocating { ProgressView().tint(.white).scaleEffect(0.7) }
+                        Spacer()
+                        if app.privacyCenter != nil {
+                            Button("解除") { app.privacyCenter = nil }.font(.system(size: 13)).foregroundStyle(ZK.errorText)
+                        }
+                    }
+                    // 自宅から離れた場所にいても設定できるようにする
+                    Button { showPicker = true } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "map").font(.system(size: 13))
+                            Text("地図から選ぶ").font(.system(size: 15, weight: .bold))
+                        }
+                        .foregroundStyle(ZK.accent)
                     }
                 }
                 .padding(16)
             }
             .innerGroup(radius: 16)
             Text("この範囲内の走行軌跡は、切り出し時に自動で除外されます").font(.system(size: 12)).foregroundStyle(ZK.caption)
+        }
+        .sheet(isPresented: $showPicker) {
+            PrivacyZonePickerView(start: app.privacyCenter ?? app.recorder.lastLocation?.coordinate ?? Region.stored.center)
+                .environmentObject(app)
         }
     }
 
@@ -120,5 +137,75 @@ struct PrivacyZoneNotice: View {
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(ZK.accent.opacity(0.6), lineWidth: 1))
         }
+    }
+}
+
+
+/// 地図を動かして、伏せたい場所の中心を決める。自宅から離れていても設定できる
+struct PrivacyZonePickerView: View {
+    @EnvironmentObject private var app: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var position: MapCameraPosition
+    @State private var center: CLLocationCoordinate2D
+    @State private var radius: Double = 1000
+
+    init(start: CLLocationCoordinate2D) {
+        _center = State(initialValue: start)
+        _position = State(initialValue: .region(MKCoordinateRegion(
+            center: start, span: MKCoordinateSpan(latitudeDelta: 0.04, longitudeDelta: 0.04))))
+    }
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Map(position: $position) {
+                MapCircle(center: center, radius: radius)
+                    .foregroundStyle(Color.white.opacity(0.12))
+                    .stroke(Color.white.opacity(0.55), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+            }
+            .mapStyle(.hybrid(elevation: .flat))
+            .onMapCameraChange(frequency: .continuous) { ctx in center = ctx.region.center }
+            .ignoresSafeArea()
+
+            // 画面の中心が、選んでいる地点
+            Image(systemName: "plus")
+                .font(.system(size: 28, weight: .thin)).foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.6), radius: 3)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .allowsHitTesting(false)
+
+            HStack {
+                Button("キャンセル") { dismiss() }
+                    .font(.system(size: 15, weight: .medium)).foregroundStyle(.white)
+                    .padding(.horizontal, 16).frame(height: 40).glassPill(radius: 999)
+                Spacer()
+                Text("地図を動かして中心を合わせる")
+                    .font(.system(size: 12)).foregroundStyle(.white)
+                    .padding(.horizontal, 14).frame(height: 40).glassPill(radius: 999)
+            }
+            .padding(.horizontal, 12).padding(.top, 10)
+
+            VStack {
+                Spacer()
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("半径").font(.system(size: 14)).foregroundStyle(.white)
+                        Spacer()
+                        Text("\(Int(radius).formatted()) m").font(.zkNumber(15)).foregroundStyle(ZK.highlight)
+                    }
+                    Slider(value: $radius, in: 300...3000, step: 100).tint(.white)
+                    Button("ここを中心にする") {
+                        app.privacyCenter = center
+                        app.privacyRadiusMeters = radius
+                        dismiss()
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                }
+                .glassCard(radius: 22, padding: EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
+                .padding(.horizontal, 10).padding(.bottom, 10)
+            }
+        }
+        .onAppear { radius = app.privacyRadiusMeters }
+        .preferredColorScheme(.dark)
     }
 }
