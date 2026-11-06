@@ -68,7 +68,9 @@ struct RoadDetailView: View {
                 Button("逆向きに走る（終点から始点へ）") { openNavigation(.reversed) }
                 Button("キャンセル", role: .cancel) {}
             } message: {
-                Text("「現在地から」を選ぶと、始点までの道のりと道中が 1 本の経路になります。すでに始点の近くにいるときは「絶景道の始点から」が分かりやすいはずです。")
+                Text("「現在地から」を選ぶと、始点までの道のりと道中が 1 本の経路になります。\n"
+                     + "いまは経由地を「\(ZekkeiRoad.RouteDetail.stored.title)」で渡します。"
+                     + "Google マップは経由地に着くたび案内をいったん終えるため、音声だけで走るときはマイページで減らせます。")
             }
             .alert("通報の理由", isPresented: $showReport) {
                 TextField("理由", text: $reportReason)

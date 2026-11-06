@@ -4,6 +4,7 @@ import CoreLocation
 /// マイページ
 struct ProfileView: View {
     @EnvironmentObject private var app: AppState
+    @State private var navDetail: ZekkeiRoad.RouteDetail = .stored
     @State private var showSignIn = false
     @State private var showNickname = false
     @State private var showRegion = false
@@ -69,6 +70,26 @@ struct ProfileView: View {
                         }
                         .padding(14).innerGroup(radius: 14)
                     }
+                    // Google マップは経由地を「立ち寄り先」として扱い、着くたびに案内が
+                    // いったん終わる。音声だけを頼りに走る人のために数を選べるようにする
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "arrow.triangle.turn.up.right.diamond").font(.system(size: 14)).foregroundStyle(ZK.accent)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("ナビに渡す経由地").font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+                                Text(navDetail.note).font(.system(size: 12)).foregroundStyle(ZK.caption)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        Picker("", selection: $navDetail) {
+                            ForEach(ZekkeiRoad.RouteDetail.allCases) { d in
+                                Text(d.title).tag(d)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .onChange(of: navDetail) { _, v in ZekkeiRoad.RouteDetail.stored = v }
+                    }
+                    .padding(14).innerGroup(radius: 14)
                     if app.isUsingMock {
                         Text("接続先が未設定のため、テスト用データで動作しています。").font(.system(size: 11)).foregroundStyle(ZK.caption)
                     }

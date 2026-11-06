@@ -134,6 +134,45 @@ struct ZekkeiRoad: Codable, Identifiable, Hashable {
 
     /// Google マップで「この道に沿った経路」を表示する URL。始点・終点に加え、道に沿った経由地を最大 8 つ渡す
     /// Google マップに渡す経路の出発地
+    /// ナビに渡す経由地の多さ。
+    /// Google マップは URL で渡した経由地を「立ち寄り先」として扱うため、着くたびに
+    /// 案内がいったん終わる。音声だけを頼りに走るときは、少ないほど途切れない。
+    /// 一方で経由地が少ないと、速い別の道へ逸れて絶景道をたどらないことがある
+    enum RouteDetail: String, CaseIterable, Identifiable {
+        case none    // 経由地なし。案内が途切れない
+        case few     // 道の中ほどに 1 か所
+        case many    // 最大 8 か所。道の線に最も忠実
+
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .none: return "経由地なし"
+            case .few:  return "少なめ（1 か所）"
+            case .many: return "多め（最大 8 か所）"
+            }
+        }
+        var note: String {
+            switch self {
+            case .none: return "案内が途切れない。速い別の道へ逸れることがある"
+            case .few:  return "途切れは 1 回。おおむね道なりに走れる"
+            case .many: return "道の線に最も忠実。立ち寄り先ごとに案内が区切られる"
+            }
+        }
+        var waypointCount: Int {
+            switch self {
+            case .none: return 0
+            case .few:  return 1
+            case .many: return 8
+            }
+        }
+
+        private static let key = "nav.routeDetail"
+        static var stored: RouteDetail {
+            get { RouteDetail(rawValue: UserDefaults.standard.string(forKey: key) ?? "") ?? .few }
+            set { UserDefaults.standard.set(newValue.rawValue, forKey: key) }
+        }
+    }
+
     enum RouteOrigin {
         /// 現在地から出発し、絶景道の始点を経由して終点まで。走り出す前に 1 度開けば、
         /// 始点までの道のりと道中が 1 本の経路としてつながる
@@ -163,14 +202,15 @@ struct ZekkeiRoad: Codable, Identifiable, Hashable {
         return comps.url
     }
 
-    func googleMapsRouteURL(from origin: RouteOrigin = .currentLocation) -> URL? {
+    func googleMapsRouteURL(from origin: RouteOrigin = .currentLocation,
+                            detail: RouteDetail = .stored) -> URL? {
         let pts = origin == .reversed ? coordinates.reversed().map { $0 } : coordinates
         guard let s = pts.first, let e = pts.last, pts.count >= 2 else { return nil }
         let f = { (c: CLLocationCoordinate2D) in String(format: "%.5f,%.5f", c.latitude, c.longitude) }
         // Google マップの URL が受け取れる経由地は 9 か所まで。現在地から始める場合は
         // 始点自体も経由地として渡すため、その分を差し引く
         let fromCurrent = origin == .currentLocation
-        let maxVia = fromCurrent ? 7 : 8
+        let maxVia = min(detail.waypointCount, fromCurrent ? 7 : 8)
         var waypoints: [String] = fromCurrent ? [f(s)] : []
         let n = min(maxVia, max(0, pts.count - 2))
         if n > 0 {
