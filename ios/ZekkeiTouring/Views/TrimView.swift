@@ -120,7 +120,7 @@ struct TrimView: View {
         .task(id: ride.publishedRoadIds) {
             var out: [ZekkeiRoad] = []
             for id in ride.publishedRoadIds {
-                if let r = try? await app.backend.road(id: id), let r { out.append(r) }
+                if let r = try? await app.backend.road(id: id) { out.append(r) }
             }
             posted = out
         }

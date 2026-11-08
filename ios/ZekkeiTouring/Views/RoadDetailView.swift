@@ -91,7 +91,7 @@ struct RoadDetailView: View {
             .task { videos = (try? await app.backend.videos(for: road.id)) ?? [] }
             // 評価が投稿されると集計が変わるため、開くたびに取り直す
             .task {
-                if let fresh = try? await app.backend.road(id: road.id), let fresh { road = fresh }
+                if let fresh = try? await app.backend.road(id: road.id) { road = fresh }
             }
             .task {
                 // 動画から抽出したスポットを先に出し、Apple の地図データで展望台・道の駅を補う
@@ -109,7 +109,6 @@ struct RoadDetailView: View {
                 guard unlocked else { return }
                 ratings = (try? await app.backend.ratings(for: road.id)) ?? []
                 media = (try? await app.backend.media(for: road.id)) ?? []
-                if let fresh = try? await app.backend.road(id: road.id) { road = fresh }
             }
         }
         .preferredColorScheme(.dark)
