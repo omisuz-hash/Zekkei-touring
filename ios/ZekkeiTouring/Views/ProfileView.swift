@@ -220,7 +220,7 @@ extension ProfileView {
                 app.lastError = "写真を読み込めませんでした。別の写真をお試しください。"
                 return
             }
-            let path = "\(uid.uuidString)/\(UUID().uuidString).jpg"
+            let path = "\(uid.uuidString.lowercased())/\(UUID().uuidString.lowercased()).jpg"
             try await app.backend.uploadMedia(data: jpeg, bucket: "avatars", path: path, contentType: "image/jpeg")
             try await app.backend.setAvatarPath(path)
             await app.refreshAccount()

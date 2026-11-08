@@ -23,108 +23,106 @@ struct RoadDetailView: View {
     private var unlocked: Bool { app.isUnlocked(road) }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                // 子の 1 つが幅を押し広げても画面からはみ出さないようにする
-                VStack(alignment: .leading, spacing: 16) {
-                    hero
-                    header
-                    routeRow
-                    if !spots.isEmpty {
-                        if unlocked { spotSection } else { spotTeaser }
-                    }
-                    HStack(spacing: 8) {
-                        StatTile(caption: "スコア", value: road.overallScore.map { String(format: "%.1f", $0) } ?? "–",
-                                 note: road.ratingCount > 0 ? "\(road.ratingCount) 件" : (road.isProvisional ? "動画から推定" : "評価待ち"), valueColor: ZK.highlight)
-                        StatTile(caption: "絶景度", value: road.displayScenery.map { String(format: "%.1f", $0) } ?? "–",
-                                 note: road.ratingCount > 0 ? (road.avgScenery.map { $0 >= 4.5 ? "最高評価" : "5 点満点" } ?? "") : (road.isProvisional ? "動画から推定" : "評価待ち"))
-                        StatTile(caption: "動画", value: "\(videos.count)", note: "YouTube")
-                    }
-                    // 主操作（閲覧枠を使う / ログイン）は半分の高さでも見える位置に置く
-                    if !unlocked { lockedContent }
-                    if let note = road.geometryNote {
-                        Text(note).font(.system(size: 10)).foregroundStyle(ZK.caption)
-                    }
-                    // 動画は閲覧枠の外（無料側）。YouTube の規約上、視聴に条件を付けない
-                    if !videos.isEmpty { videoSection }
-                    if unlocked { unlockedContent }
-                    if !unlocked && !videos.isEmpty {
-                        Text("上に引き上げると全体が見えます").font(.system(size: 11)).foregroundStyle(ZK.disabled).frame(maxWidth: .infinity)
-                    }
+        ScrollView {
+            // 子の 1 つが幅を押し広げても画面からはみ出さないようにする
+            VStack(alignment: .leading, spacing: 16) {
+                hero
+                header
+                routeRow
+                if !spots.isEmpty {
+                    if unlocked { spotSection } else { spotTeaser }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 18).padding(.top, 8).padding(.bottom, 24)
+                HStack(spacing: 8) {
+                    StatTile(caption: "スコア", value: road.overallScore.map { String(format: "%.1f", $0) } ?? "–",
+                             note: road.ratingCount > 0 ? "\(road.ratingCount) 件" : (road.isProvisional ? "動画から推定" : "評価待ち"), valueColor: ZK.highlight)
+                    StatTile(caption: "絶景度", value: road.displayScenery.map { String(format: "%.1f", $0) } ?? "–",
+                             note: road.ratingCount > 0 ? (road.avgScenery.map { $0 >= 4.5 ? "最高評価" : "5 点満点" } ?? "") : (road.isProvisional ? "動画から推定" : "評価待ち"))
+                    StatTile(caption: "動画", value: "\(videos.count)", note: "YouTube")
+                }
+                // 主操作（閲覧枠を使う / ログイン）は半分の高さでも見える位置に置く
+                if !unlocked { lockedContent }
+                if let note = road.geometryNote {
+                    Text(note).font(.system(size: 10)).foregroundStyle(ZK.caption)
+                }
+                // 動画は閲覧枠の外（無料側）。YouTube の規約上、視聴に条件を付けない
+                if !videos.isEmpty { videoSection }
+                if unlocked { unlockedContent }
+                if !unlocked && !videos.isEmpty {
+                    Text("上に引き上げると全体が見えます").font(.system(size: 11)).foregroundStyle(ZK.disabled).frame(maxWidth: .infinity)
+                }
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button { addMediaTapped() } label: { Label("写真・動画を追加", systemImage: "photo.badge.plus") }
-                        if hasMyContribution {
-                            Button(role: .destructive) { showDeleteMine = true } label: {
-                                Label("自分の投稿を取り消す", systemImage: "trash")
-                            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 18).padding(.top, 8).padding(.bottom, 24)
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button { addMediaTapped() } label: { Label("写真・動画を追加", systemImage: "photo.badge.plus") }
+                    if hasMyContribution {
+                        Button(role: .destructive) { showDeleteMine = true } label: {
+                            Label("自分の投稿を取り消す", systemImage: "trash")
                         }
-                        Button(role: .destructive) { showReport = true } label: { Label("この道を通報", systemImage: "flag") }
-                    } label: { Image(systemName: "ellipsis.circle").foregroundStyle(.white) }
-                }
+                    }
+                    Button(role: .destructive) { showReport = true } label: { Label("この道を通報", systemImage: "flag") }
+                } label: { Image(systemName: "ellipsis.circle").foregroundStyle(.white) }
             }
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .alert("自分の投稿を取り消しますか", isPresented: $showDeleteMine) {
-                Button("取り消す", role: .destructive) { Task { await deleteMine() } }
-                Button("やめる", role: .cancel) {}
-            } message: {
-                Text("あなたが付けた評価と、あなたが上げた写真・動画を削除します。"
-                     + "この道をあなたが作っていて、ほかの人の評価がまだ無い場合は、道そのものも削除されます。")
+        }
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .alert("自分の投稿を取り消しますか", isPresented: $showDeleteMine) {
+            Button("取り消す", role: .destructive) { Task { await deleteMine() } }
+            Button("やめる", role: .cancel) {}
+        } message: {
+            Text("あなたが付けた評価と、あなたが上げた写真・動画を削除します。"
+                 + "この道をあなたが作っていて、ほかの人の評価がまだ無い場合は、道そのものも削除されます。")
+        }
+        // ナビの出発地の選択。ヒーロー地図からもボタンからも同じものを出す
+        .confirmationDialog("どこから走り始めますか", isPresented: $showNavOptions, titleVisibility: .visible) {
+            Button("絶景道の始点から終点まで") { openNavigation(.roadStart) }
+            Button("現在地から（始点を経由して走り切る）") { openNavigation(.currentLocation) }
+            Button("逆向き：終点から始点まで") { openNavigation(.reversed) }
+            Button("逆向き：現在地から（終点を経由して走り切る）") { openNavigation(.reversedFromCurrent) }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("「現在地から」を選ぶと、始点までの道のりと道中が 1 本の経路になります。\n"
+                 + "いまは経由地を「\(ZekkeiRoad.RouteDetail.stored.title)」で渡します。"
+                 + "Google マップは経由地に着くたび案内をいったん終えるため、音声だけで走るときはマイページで減らせます。")
+        }
+        .alert("通報の理由", isPresented: $showReport) {
+            TextField("理由", text: $reportReason)
+            Button("送信") { report(targetType: "road", id: road.id) }
+            Button("キャンセル", role: .cancel) {}
+        }
+        .sheet(isPresented: $showSignIn) { SignInView() }
+        .sheet(isPresented: $showAddMedia) {
+            AddMediaView(road: road) { added in
+                media = added + media
+                Task { if let fresh = try? await app.backend.road(id: road.id) { road = fresh } }
             }
-            // ナビの出発地の選択。ヒーロー地図からもボタンからも同じものを出す
-            .confirmationDialog("どこから走り始めますか", isPresented: $showNavOptions, titleVisibility: .visible) {
-                Button("絶景道の始点から終点まで") { openNavigation(.roadStart) }
-                Button("現在地から（始点を経由して走り切る）") { openNavigation(.currentLocation) }
-                Button("逆向き：終点から始点まで") { openNavigation(.reversed) }
-                Button("逆向き：現在地から（終点を経由して走り切る）") { openNavigation(.reversedFromCurrent) }
-                Button("キャンセル", role: .cancel) {}
-            } message: {
-                Text("「現在地から」を選ぶと、始点までの道のりと道中が 1 本の経路になります。\n"
-                     + "いまは経由地を「\(ZekkeiRoad.RouteDetail.stored.title)」で渡します。"
-                     + "Google マップは経由地に着くたび案内をいったん終えるため、音声だけで走るときはマイページで減らせます。")
+        }
+        .sheet(item: $viewing) { m in
+            MediaViewer(media: m, url: app.backend.publicURL(bucket: m.bucket, path: m.storagePath))
+        }
+        .task { videos = (try? await app.backend.videos(for: road.id)) ?? [] }
+        // 評価が投稿されると集計が変わるため、開くたびに取り直す
+        .task {
+            if let fresh = try? await app.backend.road(id: road.id) { road = fresh }
+        }
+        .task {
+            // 動画から抽出したスポットを先に出し、Apple の地図データで展望台・道の駅を補う
+            var fromVideos: [RoadSpot] = []
+            do { fromVideos = try await app.backend.spots(for: road.id) } catch {
+                #if DEBUG
+                print("spots の読み込みに失敗: \(error)")
+                #endif
             }
-            .alert("通報の理由", isPresented: $showReport) {
-                TextField("理由", text: $reportReason)
-                Button("送信") { report(targetType: "road", id: road.id) }
-                Button("キャンセル", role: .cancel) {}
-            }
-            .sheet(isPresented: $showSignIn) { SignInView() }
-            .sheet(isPresented: $showAddMedia) {
-                AddMediaView(road: road) { added in
-                    media = added + media
-                    Task { if let fresh = try? await app.backend.road(id: road.id) { road = fresh } }
-                }
-            }
-            .sheet(item: $viewing) { m in
-                MediaViewer(media: m, url: app.backend.publicURL(bucket: m.bucket, path: m.storagePath))
-            }
-            .task { videos = (try? await app.backend.videos(for: road.id)) ?? [] }
-            // 評価が投稿されると集計が変わるため、開くたびに取り直す
-            .task {
-                if let fresh = try? await app.backend.road(id: road.id) { road = fresh }
-            }
-            .task {
-                // 動画から抽出したスポットを先に出し、Apple の地図データで展望台・道の駅を補う
-                var fromVideos: [RoadSpot] = []
-                do { fromVideos = try await app.backend.spots(for: road.id) } catch {
-                    #if DEBUG
-                    print("spots の読み込みに失敗: \(error)")
-                    #endif
-                }
-                spots = fromVideos
-                let extra = await SpotFinder.nearby(road: road, excluding: fromVideos)
-                if !extra.isEmpty { spots = fromVideos + extra }
-            }
-            .task(id: unlocked) {
-                guard unlocked else { return }
-                ratings = (try? await app.backend.ratings(for: road.id)) ?? []
-                media = (try? await app.backend.media(for: road.id)) ?? []
-            }
+            spots = fromVideos
+            let extra = await SpotFinder.nearby(road: road, excluding: fromVideos)
+            if !extra.isEmpty { spots = fromVideos + extra }
+        }
+        .task(id: unlocked) {
+            guard unlocked else { return }
+            ratings = (try? await app.backend.ratings(for: road.id)) ?? []
+            media = (try? await app.backend.media(for: road.id)) ?? []
         }
         .preferredColorScheme(.dark)
     }

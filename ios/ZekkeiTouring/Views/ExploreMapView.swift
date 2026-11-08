@@ -121,7 +121,8 @@ struct ExploreMapView: View {
             if let r = new, selected == nil { selected = r }
         }
         .sheet(item: $selected, onDismiss: { mapSelection = nil }) { road in
-            RoadDetailView(road: road)
+            // 道の詳細そのものは入れ物を持たない。地図から開くときだけ入れ物を添える
+            NavigationStack { RoadDetailView(road: road) }
                 .presentationDetents([.fraction(0.62), .large])
                 .presentationBackground(Color(hex: 0x14181C).opacity(0.96))
                 .presentationDragIndicator(.visible)
