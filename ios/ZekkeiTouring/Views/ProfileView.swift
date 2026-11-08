@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import UIKit
 import CoreLocation
 
 /// マイページ
@@ -214,21 +215,36 @@ extension ProfileView {
         defer { isUploadingAvatar = false; avatarItem = nil }
         guard let uid = app.backend.currentUserId else { return }
         do {
-            guard let data = try await item.loadTransferable(type: Data.self) else {
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let jpeg = Self.squareJPEG(from: data, side: 512) else {
                 app.lastError = "写真を読み込めませんでした。別の写真をお試しください。"
                 return
             }
-            guard data.count <= 3 * 1024 * 1024 else {
-                app.lastError = "写真が大きすぎます（3 MB まで）。別の写真をお試しください。"
-                return
-            }
             let path = "\(uid.uuidString)/\(UUID().uuidString).jpg"
-            try await app.backend.uploadMedia(data: data, bucket: "avatars", path: path, contentType: "image/jpeg")
+            try await app.backend.uploadMedia(data: jpeg, bucket: "avatars", path: path, contentType: "image/jpeg")
             try await app.backend.setAvatarPath(path)
             await app.refreshAccount()
         } catch {
             app.lastError = error.localizedDescription
         }
+    }
+
+    /// アイコン用に中央を正方形に切り、一辺 side 画素の JPEG にする。
+    /// iPhone の写真はそのままだと数 MB あり、形式も HEIC のことが多いため、必ず変換してから送る
+    static func squareJPEG(from data: Data, side: CGFloat) -> Data? {
+        guard let image = UIImage(data: data) else { return nil }
+        let w = image.size.width, h = image.size.height
+        guard w > 0, h > 0 else { return nil }
+        let edge = min(w, h)
+        let scale = side / edge
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        format.opaque = true
+        let out = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { _ in
+            image.draw(in: CGRect(x: -(w - edge) / 2 * scale, y: -(h - edge) / 2 * scale,
+                                  width: w * scale, height: h * scale))
+        }
+        return out.jpegData(compressionQuality: 0.85)
     }
 
     func clearAvatar() async {

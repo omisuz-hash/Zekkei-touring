@@ -5,6 +5,7 @@ import AVKit
 /// 道の詳細（未解放 → 解放）
 struct RoadDetailView: View {
     @EnvironmentObject private var app: AppState
+    @Environment(\.dismiss) private var dismiss
     @State var road: ZekkeiRoad
     @State private var ratings: [RoadRating] = []
     @State private var media: [RoadMedia] = []
@@ -16,6 +17,8 @@ struct RoadDetailView: View {
     @State private var showSignIn = false
     @State private var showAddMedia = false
     @State private var showNavOptions = false
+    @State private var showDeleteMine = false
+    @State private var isDeletingMine = false
 
     private var unlocked: Bool { app.isUnlocked(road) }
 
@@ -56,11 +59,23 @@ struct RoadDetailView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button { addMediaTapped() } label: { Label("写真・動画を追加", systemImage: "photo.badge.plus") }
+                        if hasMyContribution {
+                            Button(role: .destructive) { showDeleteMine = true } label: {
+                                Label("自分の投稿を取り消す", systemImage: "trash")
+                            }
+                        }
                         Button(role: .destructive) { showReport = true } label: { Label("この道を通報", systemImage: "flag") }
                     } label: { Image(systemName: "ellipsis.circle").foregroundStyle(.white) }
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
+            .alert("自分の投稿を取り消しますか", isPresented: $showDeleteMine) {
+                Button("取り消す", role: .destructive) { Task { await deleteMine() } }
+                Button("やめる", role: .cancel) {}
+            } message: {
+                Text("あなたが付けた評価と、あなたが上げた写真・動画を削除します。"
+                     + "この道をあなたが作っていて、ほかの人の評価がまだ無い場合は、道そのものも削除されます。")
+            }
             // ナビの出発地の選択。ヒーロー地図からもボタンからも同じものを出す
             .confirmationDialog("どこから走り始めますか", isPresented: $showNavOptions, titleVisibility: .visible) {
                 Button("絶景道の始点から終点まで") { openNavigation(.roadStart) }
@@ -480,6 +495,37 @@ struct RoadDetailView: View {
     /// 写真・動画の追加。ログインは必要だが、走行記録は無くてよい
     private func addMediaTapped() {
         if app.isSignedIn { showAddMedia = true } else { showSignIn = true }
+    }
+
+    /// この道に自分の投稿があるか
+    private var hasMyContribution: Bool {
+        guard let me = app.backend.currentUserId else { return false }
+        return ratings.contains { $0.userId == me } || media.contains { $0.userId == me }
+    }
+
+    private func deleteMine() async {
+        guard let me = app.backend.currentUserId else { return }
+        isDeletingMine = true
+        defer { isDeletingMine = false }
+        do {
+            // 先に保管してある実体を消す（データベースの行が消えると場所が分からなくなるため）
+            for bucket in Set(media.filter { $0.userId == me }.map(\.bucket)) {
+                let paths = media.filter { $0.userId == me && $0.bucket == bucket }.map(\.storagePath)
+                try? await app.backend.removeStorageObjects(bucket: bucket, paths: paths)
+            }
+            let roadGone = try await app.backend.deleteMyContribution(roadId: road.id)
+            app.store.forgetPublishedRoad(road.id)
+            await app.refreshAccount()
+            if roadGone {
+                dismiss()
+            } else {
+                ratings = (try? await app.backend.ratings(for: road.id)) ?? []
+                media = (try? await app.backend.media(for: road.id)) ?? []
+                if let fresh = try? await app.backend.road(id: road.id) { road = fresh }
+            }
+        } catch {
+            app.lastError = error.localizedDescription
+        }
     }
 
     private func openNavigation(_ origin: ZekkeiRoad.RouteOrigin) {

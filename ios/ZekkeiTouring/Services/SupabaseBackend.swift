@@ -202,6 +202,23 @@ final class SupabaseBackend: Backend {
 
     // MARK: 写真・動画
 
+    private struct RoadIdParams: Encodable { let p_road_id: String }
+    private struct DeletedRow: Decodable { let road_deleted: Bool }
+
+    @discardableResult
+    func deleteMyContribution(roadId: UUID) async throws -> Bool {
+        _ = try requireUser()
+        let rows: [DeletedRow] = try await client
+            .rpc("delete_my_contribution", params: RoadIdParams(p_road_id: roadId.uuidString))
+            .execute().value
+        return rows.first?.road_deleted ?? false
+    }
+
+    func removeStorageObjects(bucket: String, paths: [String]) async throws {
+        guard !paths.isEmpty else { return }
+        _ = try await client.storage.from(bucket).remove(paths: paths)
+    }
+
     private struct AvatarParams: Encodable { let p_path: String? }
 
     func setAvatarPath(_ path: String?) async throws {

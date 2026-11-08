@@ -45,6 +45,15 @@ final class RideStore: ObservableObject {
         }
     }
 
+    /// 投稿を取り消した絶景道を、走行記録の「投稿済み」から外す
+    func forgetPublishedRoad(_ roadId: UUID) {
+        for r in rides where r.publishedRoadIds.contains(roadId) {
+            var updated = r
+            updated.publishedRoadIds.removeAll { $0 == roadId }
+            save(updated)
+        }
+    }
+
     func delete(_ ride: RideLog) {
         let url = directory.appendingPathComponent("\(ride.id.uuidString).json")
         try? FileManager.default.removeItem(at: url)

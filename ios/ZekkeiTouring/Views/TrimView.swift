@@ -151,6 +151,17 @@ struct TrimView: View {
             if segmentLengthM < 500 && segment.count >= 2 {
                 Text("500 m 以上の区間を選ぶと投稿できます").font(.system(size: 12)).foregroundStyle(ZK.errorText)
             }
+            // 自宅からの移動区間まで含めたまま投稿されるのを防ぐ
+            if segmentLengthM > 30_000 {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 10)).foregroundStyle(ZK.errorText).padding(.top, 2)
+                    Text("\(Int(segmentLengthM / 1000)) km は 1 本の絶景道としては長めです。"
+                         + "出発地からの移動区間が入っていないか確かめ、見どころのある区間に絞ることを勧めます。")
+                        .font(.system(size: 11)).lineSpacing(3).foregroundStyle(ZK.errorText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
         .glassCard(radius: 22, padding: EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
     }
