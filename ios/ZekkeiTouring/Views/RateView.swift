@@ -130,12 +130,20 @@ struct RateView: View {
         return t
     }
 
+    /// 評価が入らなかったときに、作ったばかりの道を取り消す
+    private func discardCreatedRoad(_ id: UUID?) async {
+        guard let id else { return }
+        _ = try? await app.backend.deleteMyContribution(roadId: id)
+    }
+
     private func submit(attachTo existing: ZekkeiRoad? = nil, forceNew: Bool = false) async {
         guard app.isSignedIn, let userId = app.backend.currentUserId else { showSignIn = true; return }
         isSubmitting = true
         defer { isSubmitting = false }
         let simplified = GeoUtils.simplify(segment)
         let ewkt = GeoUtils.ewkt(simplified)
+        // この投稿のために新しく作った道。評価が入らなかったら取り消す
+        var createdRoadId: UUID?
         do {
             var target = existing
             if target == nil && !forceNew {
@@ -153,12 +161,14 @@ struct RateView: View {
                     startLabel: startLabel.isEmpty ? nil : startLabel, endLabel: endLabel.isEmpty ? nil : endLabel,
                     geom: ewkt, lengthM: GeoUtils.length(of: segment), curviness: GeoUtils.curviness(of: segment))
                 target = try await app.backend.createRoad(draft)
+                createdRoadId = target?.id
             }
             guard let road = target else { return }
             // 同じ走行から同じ道へ二重に投稿しない（データベース側にも制約はあるが、
             // ここで止めた方が何が起きたか分かる）
             if ride.publishedRoadIds.contains(road.id) {
                 app.lastError = "この走行からは、すでに「\(road.name)」へ投稿しています。別の区間を選んでください。"
+                await discardCreatedRoad(createdRoadId)
                 return
             }
             let seasonText = seasonOptions.filter { seasons.contains($0) }.joined(separator: "・")
@@ -170,9 +180,16 @@ struct RateView: View {
                 comment: comment.isEmpty ? nil : comment,
                 videoUrl: validatedVideoURL, riddenAt: ride.startedAt)
             // 評価は走行記録を参照するので、先にその枠を用意する（経路は送らない）
-            try await app.backend.ensureRideLog(id: ride.id, startedAt: ride.startedAt,
-                                                endedAt: ride.endedAt, distanceMeters: ride.distanceMeters)
-            try await app.backend.submitRating(rating)
+            do {
+                try await app.backend.ensureRideLog(id: ride.id, startedAt: ride.startedAt,
+                                                    endedAt: ride.endedAt, distanceMeters: ride.distanceMeters)
+                try await app.backend.submitRating(rating)
+            } catch {
+                // 評価が入らなければ、この投稿のために作った道は残さない。
+                // 残すと、誰の評価も付いていない道が地図に出てしまう
+                await discardCreatedRoad(createdRoadId)
+                throw error
+            }
             var failed = 0
             for m in pending {
                 do { _ = try await app.backend.publish(m, roadId: road.id, ratingId: rating.id, userId: userId) }
