@@ -2,6 +2,7 @@
 google: Geocoding API + Routes API（課金登録が必要。無料枠あり）
 osm:    Nominatim + OSRM（無料・キー不要。1 秒 1 リクエストの礼儀を守る。精度と可用性は劣る）
 """
+import json
 import math
 import re
 import time
@@ -395,15 +396,25 @@ def build_geometry(geo, road: dict) -> dict:
             raise GeoError(f"座標にできません（都道府県不一致または未検出）: {label}")
         return None
 
+    def pinned(v):
+        """実走の知見で座標を直接留めた地点（地名の取り違えを避けるため）"""
+        if not v:
+            return None
+        try:
+            p = json.loads(v) if isinstance(v, str) else v
+            return (float(p[0]), float(p[1]))
+        except (ValueError, TypeError, IndexError):
+            return None
+
     points = []
-    start = geocode_checked(road["start_label"], road.get("start_municipality", ""), True)
+    start = pinned(road.get("start_point")) or geocode_checked(road["start_label"], road.get("start_municipality", ""), True)
     points.append(start)
     for v in road.get("via_labels", [])[:4]:
         if v:
             p = geocode_checked(v, "", False)
             if p:
                 points.append(p)
-    end = geocode_checked(road["end_label"], road.get("end_municipality", ""), True)
+    end = pinned(road.get("end_point")) or geocode_checked(road["end_label"], road.get("end_municipality", ""), True)
     points.append(end)
 
     approx = float(road.get("approx_length_km") or 0)

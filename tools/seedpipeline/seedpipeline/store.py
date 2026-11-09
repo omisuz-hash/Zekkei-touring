@@ -99,7 +99,7 @@ class Store:
         cols = {r[1] for r in self.db.execute("pragma table_info(roads)")}
         for col, typ in (("start_municipality", "text"), ("end_municipality", "text"), ("approx_length_km", "real"), ("repair_attempts", "integer default 0"),
                          ("spots", "text"), ("spots_status", "text default 'pending'"), ("wiki_status", "text default 'pending'"),
-                         ("approx_samples", "text")):
+                         ("approx_samples", "text"), ("start_point", "text"), ("end_point", "text")):
             if col not in cols:
                 self.db.execute(f"alter table roads add column {col} {typ}")
         # spots 表も同様（写真の列は後から追加された）
@@ -392,10 +392,21 @@ class Store:
     def apply_repair(self, road_id: int, fix: dict):
         self.db.execute("""update roads set start_label=?, start_municipality=?, end_label=?, end_municipality=?, via_labels=?,
             approx_length_km=coalesce(?, approx_length_km), prefecture=case when ?<>'' then ? else prefecture end,
-            repair_attempts=coalesce(repair_attempts,0)+1, geo_status='pending', geom=null, geo_error=null, updated_at=datetime('now') where id=?""",
+            repair_attempts=coalesce(repair_attempts,0)+1, geo_status='pending', geom=null, geo_error=null,
+            start_point=null, end_point=null, updated_at=datetime('now') where id=?""",
                         (fix["start_label"], fix.get("start_municipality", ""), fix["end_label"], fix.get("end_municipality", ""),
                          json.dumps(fix.get("via_labels", []), ensure_ascii=False), fix.get("approx_length_km"),
                          fix.get("prefecture", "") or "", fix.get("prefecture", "") or "", road_id))
+        self.db.commit()
+
+    def pin_points(self, road_id: int, start: list | None, end: list | None):
+        """実走の知見で始点・終点の座標を留める（None はそのまま、[] で解除）"""
+        if start is not None:
+            self.db.execute("update roads set start_point=? where id=?",
+                            (json.dumps(start) if start else None, road_id))
+        if end is not None:
+            self.db.execute("update roads set end_point=? where id=?",
+                            (json.dumps(end) if end else None, road_id))
         self.db.commit()
 
     def mark_repair_attempted(self, road_id: int):

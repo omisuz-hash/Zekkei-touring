@@ -15,6 +15,7 @@
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import date
 
@@ -162,6 +163,24 @@ def cmd_selftest():
     print("selftest ok")
 
 
+COORD_RE = re.compile(r"(-?\d{1,2}\.\d{3,})\s*,\s*\+?\s*(-?\d{1,3}\.\d{3,})")
+
+
+def _parse_point(text: str):
+    """「35.4206,138.8713」や Google マップの URL から [経度, 緯度] を取り出す。
+    "none" なら解除を表す空リストを返す"""
+    t = (text or "").strip()
+    if t.lower() in ("none", "なし", "解除"):
+        return []
+    m = COORD_RE.search(t.replace("%2C", ",").replace("%2c", ","))
+    if not m:
+        raise ValueError(f"座標として読めません: {text}（例: 35.4206,138.8713）")
+    lat, lng = float(m.group(1)), float(m.group(2))
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        raise ValueError(f"座標の範囲が不正です: {text}")
+    return [lng, lat]
+
+
 def _show_road(r: dict):
     via = ", ".join(json.loads(r["via_labels"] or "[]")) or "なし"
     km = f"{(r['length_m'] or 0) / 1000:.1f} km" if r.get("length_m") else "未取得"
@@ -169,6 +188,10 @@ def _show_road(r: dict):
     print(f"      始点: {r['start_label']} / 終点: {r['end_label']} / 経由: {via}")
     print(f"      想定 {r['approx_length_km'] or '—'} km / 経路 {km} / 状態 {r['geo_status']}"
           + (f" ({r['geo_error']})" if r.get("geo_error") else ""))
+    for label, v in (("始点", r.get("start_point")), ("終点", r.get("end_point"))):
+        if v:
+            pt = json.loads(v)
+            print(f"      {label}の座標を留めています: {pt[1]:.5f},{pt[0]:.5f}")
 
 
 def cmd_fix_road(p: Pipeline, args) -> int:
@@ -183,12 +206,12 @@ def cmd_fix_road(p: Pipeline, args) -> int:
     if not found:
         print(f"「{args.query or args.id}」に当たる道がありません")
         return 1
-    edits = {k: getattr(args, k) for k in ("start", "end", "via", "km", "pref")}
+    edits = {k: getattr(args, k) for k in ("start", "end", "via", "km", "pref", "start_at", "end_at")}
     if not any(v is not None for v in edits.values()):
         print(f"候補 {len(found)} 本:")
         for r in found:
             _show_road(r)
-        print("\n直すときは --start / --end / --via / --km を付けてください（同名が複数なら --id も）")
+        print("\n直すときは --start / --end / --via / --km / --start-at / --end-at を付けてください（同名が複数なら --id も）")
         return 0
     if len(found) > 1:
         print(f"候補が {len(found)} 本あります。--id で 1 本に絞ってください:")
@@ -211,7 +234,21 @@ def cmd_fix_road(p: Pipeline, args) -> int:
         "approx_length_km": args.km if args.km is not None else r["approx_length_km"],
         "prefecture": args.pref or "",
     }
+    try:
+        start_pt = _parse_point(args.start_at) if args.start_at else None
+        end_pt = _parse_point(args.end_at) if args.end_at else None
+    except ValueError as e:
+        print(e)
+        return 1
+    # apply_repair は言い直しとして座標の留めを解除するため、留め直しはその後に行う
     p.store.apply_repair(r["id"], fix)
+    if start_pt is not None or end_pt is not None:
+        p.store.pin_points(r["id"], start_pt, end_pt)
+    elif r.get("start_point") or r.get("end_point"):
+        # 既に留めてあった座標は、明示的に解除されない限り引き継ぐ
+        p.store.pin_points(r["id"],
+                           json.loads(r["start_point"]) if r.get("start_point") else None,
+                           json.loads(r["end_point"]) if r.get("end_point") else None)
     after, g = p.geo_one(r["id"])
     print("変更後:")
     if after:
@@ -267,6 +304,8 @@ def main():
     fr.add_argument("--via", help="経由地をカンマ区切りで差し替える（空文字で全て外す）")
     fr.add_argument("--km", type=float, help="想定の距離（km）。経路がこれと大きく食い違うと要確認になる")
     fr.add_argument("--pref", help="都道府県を差し替える")
+    fr.add_argument("--start-at", help="始点の座標を直接留める（例: 35.4206,138.8713。Google マップの地点長押しでコピーできる。解除は none）")
+    fr.add_argument("--end-at", help="終点の座標を直接留める（同上）")
     fr.add_argument("--id", type=int, help="同名が複数あるときに id で選ぶ")
     args = ap.parse_args()
 
