@@ -464,4 +464,6 @@ def build_geometry(geo, road: dict) -> dict:
     if L > MAX_PLAUSIBLE_M and not (approx > 0 and (L / 1000) / approx <= 1.5):
         suspect = f"1 本の道として長すぎます（{L / 1000:.0f} km）"
     return {"coords": line, "length_m": L, "curviness": curviness(line), "straight_m": straight,
-            "start": line[0], "end": line[-1], "closed": closed, "suspect": suspect}
+            "start": line[0], "end": line[-1], "closed": closed, "suspect": suspect,
+            # 地点名がどの座標になったか（取り違えを目で確かめるため）
+            "points": points}

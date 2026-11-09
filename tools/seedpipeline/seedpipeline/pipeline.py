@@ -187,12 +187,14 @@ class Pipeline:
             self.geo.calls = 0
         return ok
 
-    def geo_one(self, road_id: int) -> dict | None:
-        """1 本だけ形状を取り直す（人手で始点・終点を直した直後に使う）"""
+    def geo_one(self, road_id: int) -> tuple[dict | None, dict | None]:
+        """1 本だけ形状を取り直す（人手で始点・終点を直した直後に使う）。
+        戻り値は（直後の道, 形状の中身）。形状の中身には地点名の解決結果が入る"""
         r = self.store.road(road_id)
         if not r:
-            return None
+            return None, None
         r["via_labels"] = json.loads(r["via_labels"] or "[]")
+        g = None
         try:
             g = build_geometry(self.geo, r)
             self.store.save_geo(r["id"], g["coords"], g["length_m"], g["curviness"], None, g.get("suspect"))
@@ -205,7 +207,7 @@ class Pipeline:
             log(f"形状 NG: {r['name']} ({e})")
         self.store.add_quota(geo_calls=getattr(self.geo, "calls", 0))
         self.geo.calls = 0
-        return self.store.road(road_id)
+        return self.store.road(road_id), g
 
     # 4a'. 見直し: 後から分かった概算距離と形状が合わない道を、修復の対象に戻す ----------
     def recheck(self) -> int:

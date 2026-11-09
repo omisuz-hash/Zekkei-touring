@@ -209,10 +209,17 @@ def cmd_fix_road(p: Pipeline, args) -> int:
         "prefecture": args.pref or "",
     }
     p.store.apply_repair(r["id"], fix)
-    after = p.geo_one(r["id"])
+    after, g = p.geo_one(r["id"])
     print("変更後:")
     if after:
         _show_road(after)
+    if g and g.get("points"):
+        labels = [fix["start_label"]] + list(fix["via_labels"]) + [fix["end_label"]]
+        print("      地点名の解決結果（地図で確かめるとき用）:")
+        for i, pt in enumerate(g["points"]):
+            name = labels[i] if i < len(labels) else "?"
+            print(f"        {name}: https://www.google.com/maps?q={pt[1]:.5f},{pt[0]:.5f}")
+        print("      ※ 経由地は始点・終点から離れすぎていると自動で外れるため、並びがずれることがある")
     print("\n反映するには export してから、出力された SQL を Supabase に適用してください")
     return 0
 
