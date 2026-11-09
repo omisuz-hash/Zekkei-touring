@@ -188,11 +188,33 @@ def cmd_contributors(p: Pipeline, args) -> int:
     if not rows:
         print("まだ集計できる動画がありません")
         return 1
+
+    stats = {}
+    if args.with_stats:
+        if not p.yt:
+            print("（YOUTUBE_API_KEY が未設定のため、登録者数は取れません）\n")
+        else:
+            try:
+                stats = p.yt.channel_stats([r["channel_id"] for r in rows])
+                p._spend_yt()
+            except Exception as e:
+                print(f"（登録者数の取得に失敗したため、本数のみで出します: {e}）\n")
+
+    def subs(r):
+        v = stats.get(r["channel_id"], {}).get("subscribers")
+        return "—" if v is None else f"{v:,}"
+
     total = sum(r["roads"] for r in rows)
     print(f"チャンネル {len(rows)} 件 / 道のべ {total} 本\n")
-    print(f"{'順':>3}  {'道':>4} {'動画':>4}  チャンネル")
+    head = f"{'順':>3}  {'道':>4} {'動画':>4}"
+    if stats:
+        head += f" {'登録者':>9}"
+    print(head + f"  {'最新':<11} チャンネル")
     for i, r in enumerate(rows[:40], 1):
-        print(f"{i:>3}  {r['roads']:>4} {r['videos']:>4}  {r['channel']}")
+        line = f"{i:>3}  {r['roads']:>4} {r['videos']:>4}"
+        if stats:
+            line += f" {subs(r):>9}"
+        print(line + f"  {(r['latest'] or '')[:10]:<11} {r['channel']}")
     if len(rows) > 40:
         print(f"      … ほか {len(rows) - 40} 件")
     if args.csv:
@@ -201,10 +223,12 @@ def cmd_contributors(p: Pipeline, args) -> int:
         with open(args.csv, "w", encoding="utf-8-sig", newline="") as f:
             w = csv.writer(f)
             w.writerow(["順位", "チャンネル名", "チャンネルID", "道の本数", "動画の本数",
-                        "最新の投稿日", "チャンネルURL"])
+                        "登録者数", "総再生数", "最新の投稿日", "チャンネルURL"])
             for i, r in enumerate(rows, 1):
                 url = f"https://www.youtube.com/channel/{r['channel_id']}" if r["channel_id"] else ""
+                st = stats.get(r["channel_id"], {})
                 w.writerow([i, r["channel"], r["channel_id"], r["roads"], r["videos"],
+                            st.get("subscribers", ""), st.get("views", ""),
                             (r["latest"] or "")[:10], url])
         print(f"\nCSV → {args.csv}")
     return 0
@@ -329,6 +353,8 @@ def main():
     co = sub.add_parser("contributors", help="道の元になった動画のチャンネルを、貢献の多い順に並べる")
     co.add_argument("--limit", type=int, default=100)
     co.add_argument("--csv", help="CSV に書き出す先（省略すると画面に出すだけ）")
+    co.add_argument("--with-stats", action="store_true",
+                    help="チャンネルの登録者数・総再生数も取る（YouTube API を 50 件あたり 1 ユニット使う）")
     fr = sub.add_parser("fix-road", help="実走の知見で道の始点・終点を手で直し、その 1 本だけ形状を取り直す")
     fr.add_argument("query", nargs="?", default="", help="道の名前の一部（例: パノラマ台）。--id を使うときは省略できる")
     fr.add_argument("--start", help="始点の目印に差し替える")

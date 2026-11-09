@@ -76,6 +76,25 @@ class YouTube:
         items = data.get("items", [])
         return items[0]["contentDetails"]["relatedPlaylists"]["uploads"] if items else None
 
+    def channel_stats(self, channel_ids: list[str]) -> dict[str, dict]:
+        """チャンネルの登録者数と総再生数。50 件ごとに 1 ユニット"""
+        out: dict[str, dict] = {}
+        for i in range(0, len(channel_ids), 50):
+            chunk = [c for c in channel_ids[i:i + 50] if c]
+            if not chunk:
+                continue
+            data = self._get("channels", {"part": "snippet,statistics", "id": ",".join(chunk)})
+            for it in data.get("items", []):
+                st = it.get("statistics", {})
+                out[it["id"]] = {
+                    "title": it.get("snippet", {}).get("title", ""),
+                    "subscribers": None if st.get("hiddenSubscriberCount") else int(st.get("subscriberCount", 0) or 0),
+                    "views": int(st.get("viewCount", 0) or 0),
+                    "uploads": int(st.get("videoCount", 0) or 0),
+                    "custom_url": it.get("snippet", {}).get("customUrl", ""),
+                }
+        return out
+
     def playlist_video_ids(self, playlist_id: str, max_items: int = 200) -> list[str]:
         ids, token = [], None
         while len(ids) < max_items:
