@@ -8,6 +8,11 @@
 <meta property="og:title" content="絶景道 — バイクツーリングの道の口コミ地図">
 <meta property="og:description" content="走って気持ちのいい道を、ライダー同士で共有する iPhone アプリ。">
 <meta property="og:type" content="website">
+<meta property="og:url" content="https://tidalworks.jp/zekkeido/">
+<meta property="og:image" content="https://tidalworks.jp/zekkeido/img/icon.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="apple-touch-icon" href="/zekkeido/img/icon.jpg">
+<link rel="icon" href="/zekkeido/img/icon.jpg">
 <style>
   :root{--bg:#ffffff;--fg:#1a1d1f;--muted:#5c6468;--line:#e3e7ea;--accent:#1b7fb8;--card:#f6f8f9}
   @media (prefers-color-scheme:dark){:root{--bg:#121517;--fg:#e8ecee;--muted:#9aa3a8;--line:#272c30;--accent:#5fb9e6;--card:#1a1e21}}
@@ -29,16 +34,50 @@
   a{color:var(--accent)}
   .links{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:10px;font-size:15px}
   footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
-  @media (max-width:520px){.wrap{padding:36px 16px 72px}h1{font-size:24px}.cards{grid-template-columns:1fr}}
+  .hero{display:flex;align-items:center;gap:20px;margin-bottom:28px}
+  .hero img{width:104px;height:104px;border-radius:23px;border:1px solid var(--line);flex:none;
+            box-shadow:0 10px 30px rgba(0,0,0,.18)}
+  .hero h1{margin:0 0 6px}
+  .shots{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0 8px}
+  .shot{margin:0}
+  .shot img{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:14px;
+            background:#000}
+  .shot figcaption{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.6}
+  .btn{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;font-weight:700;
+       font-size:15px;padding:13px 22px;border-radius:12px;margin:4px 8px 4px 0}
+  .btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+  @media (max-width:520px){.wrap{padding:36px 16px 72px}h1{font-size:24px}.cards{grid-template-columns:1fr}
+    .hero{gap:14px}.hero img{width:76px;height:76px;border-radius:17px}
+    .shots{grid-template-columns:1fr 1fr;gap:10px}.shots .shot:last-child{display:none}}
 </style>
 </head>
 <body>
 <div class="wrap">
 
-<p class="kicker">ZEKKEI-DO</p>
-<h1>絶景道</h1>
-<p class="lead">走って気持ちのいい道を、ライダー同士で共有する道の口コミ地図。</p>
-<p class="sub">iPhone アプリ（現在ベータ公開の準備中）</p>
+<div class="hero">
+  <img src="img/icon.jpg" alt="絶景道のアイコン" width="104" height="104">
+  <div>
+    <p class="kicker">ZEKKEI-DO</p>
+    <h1>絶景道</h1>
+    <p class="lead">走って気持ちのいい道を、ライダー同士で共有する道の口コミ地図。</p>
+  </div>
+</div>
+<p class="sub">iPhone アプリ · 現在 TestFlight で先行テスト中</p>
+
+<div class="shots">
+  <figure class="shot">
+    <img src="img/shot-rides.webp" alt="走行記録の一覧画面" loading="lazy">
+    <figcaption>走行を記録する。良かった区間だけを後から切り出せる</figcaption>
+  </figure>
+  <figure class="shot">
+    <img src="img/shot-road.webp" alt="絶景道の詳細画面" loading="lazy">
+    <figcaption>区間の形と写真。そのまま地図アプリへ渡してナビにできる</figcaption>
+  </figure>
+  <figure class="shot">
+    <img src="img/shot-rating.webp" alt="評価とコメントの画面" loading="lazy">
+    <figcaption>5 つの観点の評価と、実際に走った人のコメント</figcaption>
+  </figure>
+</div>
 
 <h2>できること</h2>
 <div class="cards">
@@ -70,6 +109,16 @@
   <li>アプリの操作は、必ず安全な場所に停止したうえで行うこと。</li>
   <li>掲載している道の情報は、投稿および動画に基づく参考情報である。路面の状態、通行止め、冬季閉鎖および天候は随時変化するため、走行前に自ら確認すること。</li>
 </ul>
+
+<h2>ベータ版について</h2>
+<p>現在 TestFlight で先行テストを行っている。参加いただける方を募集中である。</p>
+<!-- TestFlight の公開リンクが発行されたら、下の href を差し替えること
+     例: <a class="btn" href="https://testflight.apple.com/join/XXXXXXXX">TestFlight で試す</a> -->
+<p>
+  <a class="btn" href="mailto:support@tidalworks.jp?subject=%E7%B5%B6%E6%99%AF%E9%81%93%20%E3%83%99%E3%83%BC%E3%82%BF%E5%8F%82%E5%8A%A0%E5%B8%8C%E6%9C%9B">ベータ参加を問い合わせる</a>
+  <a class="btn ghost" href="/zekkeido/privacy/">プライバシーについて</a>
+</p>
+<p class="sub">iPhone（iOS 17 以降）に対応。アプリ内課金は無い。</p>
 
 <h2>規約・お問い合わせ</h2>
 <div class="links">
