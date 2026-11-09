@@ -528,6 +528,40 @@ struct RoadRating: Codable, Identifiable, Hashable {
     }
 }
 
+/// 自分が投稿した評価のうち、あとから直せる部分だけを運ぶ。
+/// 道の名前や区間の形は、ほかの人の評価も載る共有の情報なので対象にしない
+struct RatingEdit: Encodable {
+    var scenery: Int
+    var rideQuality: Int
+    var winding: Int
+    var restStops: Int
+    var parking: Int
+    var traffic: Int?
+    var season: String?
+    var comment: String?
+
+    enum CodingKeys: String, CodingKey {
+        case scenery
+        case rideQuality = "ride_quality"
+        case winding
+        case restStops = "rest_stops"
+        case parking, traffic, season, comment
+    }
+
+    // 未入力に戻したときに「空」として送るため、省略せず null を送る
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(scenery, forKey: .scenery)
+        try c.encode(rideQuality, forKey: .rideQuality)
+        try c.encode(winding, forKey: .winding)
+        try c.encode(restStops, forKey: .restStops)
+        try c.encode(parking, forKey: .parking)
+        try c.encode(traffic, forKey: .traffic)
+        try c.encode(season, forKey: .season)
+        try c.encode(comment, forKey: .comment)
+    }
+}
+
 // MARK: - 閲覧枠・会員
 
 enum Plan: String, Codable {

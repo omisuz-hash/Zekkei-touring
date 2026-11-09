@@ -18,6 +18,7 @@ struct RoadDetailView: View {
     @State private var showAddMedia = false
     @State private var showNavOptions = false
     @State private var showDeleteMine = false
+    @State private var editingRating: RoadRating?
     @State private var isDeletingMine = false
 
     private var unlocked: Bool { app.isUnlocked(road) }
@@ -58,6 +59,9 @@ struct RoadDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button { addMediaTapped() } label: { Label("写真・動画を追加", systemImage: "photo.badge.plus") }
+                    if let mine = myRating {
+                        Button { editingRating = mine } label: { Label("自分の評価を直す", systemImage: "square.and.pencil") }
+                    }
                     if hasMyContribution {
                         Button(role: .destructive) { showDeleteMine = true } label: {
                             Label("自分の投稿を取り消す", systemImage: "trash")
@@ -98,6 +102,15 @@ struct RoadDetailView: View {
                 media = added + media
                 Task { if let fresh = try? await app.backend.road(id: road.id) { road = fresh } }
             }
+        }
+        .sheet(item: $editingRating) { r in
+            EditRatingView(rating: r) {
+                Task {
+                    ratings = (try? await app.backend.ratings(for: road.id)) ?? []
+                    if let fresh = try? await app.backend.road(id: road.id) { road = fresh }
+                }
+            }
+            .environmentObject(app)
         }
         .sheet(item: $viewing) { m in
             MediaViewer(media: m, url: app.backend.publicURL(bucket: m.bucket, path: m.storagePath))
@@ -437,6 +450,17 @@ struct RoadDetailView: View {
                         if let s = r.season, !s.isEmpty { Text(s).font(.system(size: 10)).foregroundStyle(ZK.caption) }
                     }
                     if let c = r.comment, !c.isEmpty { Text(c).font(.system(size: 13)).lineSpacing(5).foregroundStyle(ZK.body) }
+                    // 自分の評価は、その場で直せるようにする（長押しに隠さない）
+                    if r.userId == app.backend.currentUserId {
+                        HStack(spacing: 8) {
+                            Text("自分の評価").font(.system(size: 10, weight: .bold)).foregroundStyle(ZK.caption)
+                            Spacer(minLength: 0)
+                            Button { editingRating = r } label: {
+                                Label("直す", systemImage: "square.and.pencil")
+                                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(ZK.accent)
+                            }
+                        }
+                    }
                 }
                 .padding(12).innerGroup(radius: 12, thin: true)
                 .contextMenu {
@@ -493,6 +517,12 @@ struct RoadDetailView: View {
     /// 写真・動画の追加。ログインは必要だが、走行記録は無くてよい
     private func addMediaTapped() {
         if app.isSignedIn { showAddMedia = true } else { showSignIn = true }
+    }
+
+    /// この道に付けた自分の評価（あれば）
+    private var myRating: RoadRating? {
+        guard let me = app.backend.currentUserId else { return nil }
+        return ratings.first { $0.userId == me }
     }
 
     /// この道に自分の投稿があるか

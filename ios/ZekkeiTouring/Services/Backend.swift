@@ -29,6 +29,8 @@ protocol Backend: AnyObject {
     /// 走った時刻と距離だけを置き、経路そのものは端末に残す
     func ensureRideLog(id: UUID, startedAt: Date, endedAt: Date?, distanceMeters: Double) async throws
     func submitRating(_ rating: RoadRating) async throws
+    /// 自分が付けた評価の、点数・季節・コメントを直す
+    func updateRating(id: UUID, edit: RatingEdit) async throws
     /// 自分の投稿（評価・写真・動画）を取り消す。自分が作った道で他の人の評価が
     /// 無ければ道ごと消える。戻り値は道ごと消えたか
     @discardableResult func deleteMyContribution(roadId: UUID) async throws -> Bool
@@ -145,6 +147,8 @@ final class MockBackend: Backend {
     func removeStorageObjects(bucket: String, paths: [String]) async throws {}
 
     func ensureRideLog(id: UUID, startedAt: Date, endedAt: Date?, distanceMeters: Double) async throws {}
+
+    func updateRating(id: UUID, edit: RatingEdit) async throws {}
 
     func submitRating(_ rating: RoadRating) async throws {
         ratingsByRoad[rating.roadId, default: []].append(rating)

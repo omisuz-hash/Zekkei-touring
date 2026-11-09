@@ -145,6 +145,11 @@ final class SupabaseBackend: Backend {
         try await client.from("road_ratings").insert(rating).execute()
     }
 
+    func updateRating(id: UUID, edit: RatingEdit) async throws {
+        // 直せるのは本人の行だけ（行ごとの出し分けで担保している）
+        try await client.from("road_ratings").update(edit).eq("id", value: id.uuidString).execute()
+    }
+
     func ratings(for roadId: UUID) async throws -> [RoadRating] {
         // 投稿者のニックネームとアイコンを一緒に取る（profiles は誰でも参照できる）
         try await client.from("road_ratings").select("*, profiles(display_name, avatar_url)")
