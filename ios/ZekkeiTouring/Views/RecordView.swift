@@ -172,7 +172,8 @@ struct RidesListView: View {
                 }
                 .onDelete { idx in idx.map { app.store.rides[$0] }.forEach { app.store.delete($0) } }
                 if !app.store.rides.isEmpty {
-                    Text("左にスワイプで削除").font(.system(size: 12)).foregroundStyle(ZK.disabled).frame(maxWidth: .infinity)
+                    Text("左にスワイプで削除 ・ 開いて左上の ↑ から GPX で書き出し")
+                        .font(.system(size: 12)).foregroundStyle(ZK.disabled).frame(maxWidth: .infinity)
                         .listRowBackground(Color.clear).listRowSeparator(.hidden)
                 }
             }

@@ -66,10 +66,18 @@ struct TrimView: View {
             .mapStyle(.hybrid(elevation: .realistic))
             .ignoresSafeArea()
 
-            HStack {
+            HStack(spacing: 8) {
                 Button("あとで") { dismiss() }
                     .font(.system(size: 15, weight: .medium)).foregroundStyle(.white)
                     .padding(.horizontal, 16).frame(height: 40).glassPill(radius: 999)
+                // GPX で書き出す。他の記録アプリへ移すときや、控えを残すときに使う。
+                // 軌跡そのものを渡すため、自宅周辺を含む点は共有先を選ぶ時点で利用者が判断する
+                ShareLink(item: ride, preview: SharePreview(TrackExporter.fileName(for: ride))) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
+                        .frame(width: 40, height: 40).glassPill(radius: 999)
+                }
+                .accessibilityLabel("この走行記録を GPX で書き出す")
                 Spacer()
                 Text(String(format: "走行 %.1f km · %@", ride.distanceMeters / 1000, durationText(ride.duration)))
                     .font(.system(size: 13)).foregroundStyle(.white)
