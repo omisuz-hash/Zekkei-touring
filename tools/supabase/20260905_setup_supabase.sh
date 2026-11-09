@@ -34,6 +34,35 @@ if [[ "${1:-}" == "--token-only" ]]; then
   fi
 fi
 
+# --google-only: Google ログイン用の iOS クライアント ID だけを入れ直す
+if [[ "${1:-}" == "--google-only" ]]; then
+  [[ -f "$KEYFILE" ]] || { echo "既存の設定 $KEYFILE がありません。引数なしで実行して全項目を登録してください。"; exit 1; }
+  echo "絶景道: Google ログイン用 iOS クライアント ID の登録（他の項目は変更しません）"
+  echo "  取得先: Google Cloud Console → APIs & Services → 認証情報 → OAuth クライアント ID（iOS）"
+  grep -v '^export GOOGLE_IOS_CLIENT_ID=' "$KEYFILE" > "$TMP"
+  gid=""
+  while [[ -z "${gid}" ]]; do
+    read -r -p "iOS クライアント ID（...apps.googleusercontent.com。こちらは表示されます）: " gid
+    if [[ -z "${gid}" ]]; then
+      echo "  空です。もう一度入力してください。"
+    elif [[ ! "${gid}" =~ ^[0-9]+-[A-Za-z0-9_]+\.apps\.googleusercontent\.com$ ]]; then
+      echo "  形の確認ができません。「数字-英数字.apps.googleusercontent.com」の形で入力してください。"; gid=""
+    fi
+  done
+  printf 'export GOOGLE_IOS_CLIENT_ID=%q\n' "${gid}" >> "$TMP"
+  chmod 600 "$TMP"
+  echo "検証中…"
+  if ( set -a; source "$TMP"; set +a; python3 20260905_db_admin.py check ); then
+    cp -p "$KEYFILE" "$KEYFILE.bak.$(date +%Y%m%d%H%M%S)"
+    mv "$TMP" "$KEYFILE"; trap - EXIT
+    echo "保存しました: $KEYFILE（元の内容は .bak.* に残しています）"
+    echo "次に  source ~/.zekkei_supabase && python3 20260905_db_admin.py auth-apply  を実行してください。"
+    exit 0
+  else
+    echo "検証に失敗したため保存しませんでした。元の設定はそのままです。"; exit 1
+  fi
+fi
+
 echo "絶景道: Supabase 接続情報の登録"
 url=""
 while [[ -z "${url}" ]]; do
