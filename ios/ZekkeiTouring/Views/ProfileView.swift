@@ -183,18 +183,34 @@ struct ProfileView: View {
             .sheet(isPresented: $showSignIn) { SignInView() }
             .sheet(isPresented: $showNickname) { NicknameView() }
             .sheet(isPresented: $showRegion) { RegionPickerView() }
-            .alert("アカウントを削除しますか", isPresented: $showDeleteConfirm) {
-                Button("削除する", role: .destructive) {
-                    isDeleting = true
-                    Task { _ = await app.deleteAccount(); isDeleting = false }
+            // 走行記録は端末にしか無く、ログインしていなくても使える。
+            // アカウントを消したときに道連れにするかは、利用者に選ばせる
+            .confirmationDialog("アカウントを削除しますか", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+                Button("アカウントだけ削除（走行記録は端末に残す）", role: .destructive) {
+                    deleteAccount(alsoLocalRides: false)
+                }
+                Button("アカウントと、この端末の走行記録を削除", role: .destructive) {
+                    deleteAccount(alsoLocalRides: true)
                 }
                 Button("キャンセル", role: .cancel) {}
             } message: {
-                Text("プロフィール・走行記録・評価・投稿した写真・閲覧枠を削除します。公開済みの絶景道そのものは、他の方が見られる状態のまま残り、あなたとの結び付けだけが外れます。この操作は取り消せません。")
+                Text("サーバー側のプロフィール・評価・投稿した写真・閲覧枠を削除します。"
+                     + "公開済みの絶景道そのものは、他の方が見られる状態のまま残り、あなたとの結び付けだけが外れます。"
+                     + "この操作は取り消せません。\n\n"
+                     + "走行記録 \(app.store.rides.count) 件はこの端末にだけ保存されています。"
+                     + "端末を手放す予定があるときは、合わせて削除してください。")
             }
             .refreshable { await app.refreshAccount() }
         }
         .preferredColorScheme(.dark)
+    }
+
+    private func deleteAccount(alsoLocalRides: Bool) {
+        isDeleting = true
+        Task {
+            _ = await app.deleteAccount(alsoLocalRides: alsoLocalRides)
+            isDeleting = false
+        }
     }
 
     private func linkRow(_ title: String, url: URL) -> some View {

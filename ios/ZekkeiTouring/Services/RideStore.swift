@@ -54,6 +54,18 @@ final class RideStore: ObservableObject {
         }
     }
 
+    /// この端末に残っている走行記録を全て消す（アカウント削除のときだけ使う）
+    @discardableResult
+    func deleteAll() -> Int {
+        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        for url in files where url.pathExtension == "json" {
+            try? FileManager.default.removeItem(at: url)
+        }
+        let n = rides.count
+        rides = []
+        return n
+    }
+
     func delete(_ ride: RideLog) {
         let url = directory.appendingPathComponent("\(ride.id.uuidString).json")
         try? FileManager.default.removeItem(at: url)

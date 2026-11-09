@@ -73,9 +73,11 @@ final class AppState: ObservableObject {
     }
 
     /// アカウントを削除する。成功したら true
-    func deleteAccount() async -> Bool {
+    /// アカウントを削除する。走行記録は端末にしか無いため、消すかどうかは利用者が選ぶ
+    func deleteAccount(alsoLocalRides: Bool = false) async -> Bool {
         do {
             try await backend.deleteAccount()
+            if alsoLocalRides { store.deleteAll() }
             profile = nil
             isSignedIn = false
             creditBalance = 0
