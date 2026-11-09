@@ -38,8 +38,9 @@
   .hero img{width:104px;height:104px;border-radius:23px;border:1px solid var(--line);flex:none;
             box-shadow:0 10px 30px rgba(0,0,0,.18)}
   .hero h1{margin:0 0 6px}
-  .shots{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:14px;margin:18px 0 8px}
-  .shot{margin:0}
+  .shots{display:flex;gap:14px;margin:18px -20px 8px;padding:0 20px 10px;overflow-x:auto;
+         scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+  .shot{margin:0;flex:0 0 196px;scroll-snap-align:start}
   .shot img{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:14px;
             background:#000}
   .shot figcaption{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.6}
@@ -48,7 +49,7 @@
   .btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
   @media (max-width:520px){.wrap{padding:36px 16px 72px}h1{font-size:24px}.cards{grid-template-columns:1fr}
     .hero{gap:14px}.hero img{width:76px;height:76px;border-radius:17px}
-    .shots{grid-template-columns:1fr 1fr;gap:10px}}
+    .shots{margin:16px -16px 8px;padding:0 16px 10px;gap:10px}.shot{flex:0 0 64%}}
 </style>
 </head>
 <body>
@@ -74,12 +75,7 @@
   <figure class="shot">
     <img src="img/shot-record.webp" alt="走行を記録する画面" loading="lazy"
          onerror="this.closest('figure').remove()">
-    <figcaption>走り出す前に記録を始める。軌跡は端末内にだけ残る</figcaption>
-  </figure>
-  <figure class="shot">
-    <img src="img/shot-rides.webp" alt="走行記録の一覧画面" loading="lazy"
-         onerror="this.closest('figure').remove()">
-    <figcaption>走った記録から、良かった区間だけを切り出せる</figcaption>
+    <figcaption>走り出す前に記録を始め、後から良かった区間だけを切り出す</figcaption>
   </figure>
   <figure class="shot">
     <img src="img/shot-road.webp" alt="絶景道の詳細画面" loading="lazy"
