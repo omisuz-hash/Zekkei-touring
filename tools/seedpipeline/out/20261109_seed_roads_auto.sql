@@ -1,4 +1,4 @@
--- 自動収集した絶景道シード（2026-11-09）。3396 本
+-- 自動収集した絶景道シード（2026-11-09）。3397 本
 -- 生成元: tools/seedpipeline。形状は地図 API の経路（geometry_quality = routed）
 -- 前提: 20260903_init.sql, 20260904_media.sql, 20260904_road_videos.sql, 20260906_hints.sql, 20260906_spots.sql, 20260906_spot_photos.sql 適用済み
 
@@ -5900,6 +5900,58 @@ select z.id, s.name, s.kind, s.lat, s.lng, s.note, s.source, s.video_id, s.photo
   ('芦ノ湖遊覧船', 'viewpoint', 35.234073, 138.997832, '芦ノ湖遊覧船（あしのこゆうらんせん）は、神奈川県箱根町の芦ノ湖で観光客の輸送を行なう、富士急グループの箱根遊船株式会社（はこねゆうせん）が運営する船である。', 'wikipedia', '', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2b/AshinokoYuransen8382.jpg/960px-AshinokoYuransen8382.jpg', 'Wikipedia', 'wikipedia'),
   ('鞍掛山', 'viewpoint', 35.176028, 139.025556, '鞍掛山（くらかけやま）は、神奈川県足柄下郡箱根町と静岡県田方郡函南町の境にある、標高1004mの山である。', 'wikipedia', '', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/4/41/Mount_Kurakake_2011918.jpg/960px-Mount_Kurakake_2011918.jpg', 'Wikipedia', 'wikipedia')
 ) as s(name, kind, lat, lng, note, source, video_id, photo_url, photo_credit, photo_source) where z.seed_key = 'name:椿ライン'
+on conflict (road_id, name) do update set note = excluded.note, kind = excluded.kind, source = excluded.source, photo_url = coalesce(excluded.photo_url, road_spots.photo_url), photo_credit = coalesce(excluded.photo_credit, road_spots.photo_credit), photo_source = coalesce(excluded.photo_source, road_spots.photo_source) where road_spots.source in ('seed_auto', 'wikipedia');
+
+with r as (
+  insert into public.zekkei_roads (name, description, prefecture, start_label, end_label, geom, length_m, curviness, is_seed, youtube_url, youtube_channel, source, geometry_quality, seed_key, hint_scenery, hint_winding, hint_surface, hint_rest, hint_parking, mention_count)
+  values ('県道730号（パノラマ台）', '富士小山側から三国峠を越えて山中湖へ抜ける峠道。途中にあるパノラマ台からは山中湖と富士山の絶景を一望できます。
+注意: 観光シーズン中の混雑・渋滞 / 冬季凍結注意 / パノラマ台付近は観光客・撮影者で混雑しやすい。 / 冬季急な路面凍結に注意 / 観光渋滞注意 / 観光シーズンはパノラマ台周辺で渋滞や混雑あり / パノラマ台の駐車場は砂利で傾斜があるため注意 / ススキの季節や休日はパノラマ台周辺が混雑しやすい / 路肩駐車や観光客の混雑に注意 / 絶景スポットの山中湖パノラマ台駐車場は混雑しやすい
+（動画 31 本から自動抽出。位置は地図経路による推定）', '山梨県', '平野交差点', '三国峠', 'SRID=4326;LINESTRING(138.903920 35.426270, 138.904990 35.426820, 138.914710 35.426270, 138.915080 35.425990, 138.914450 35.423410, 138.912850 35.422790, 138.909130 35.416210, 138.909010 35.415630, 138.909710 35.413860, 138.909440 35.413740, 138.908500 35.413990, 138.908220 35.413730, 138.908370 35.412350, 138.908840 35.411650, 138.909590 35.411060, 138.909890 35.411140, 138.909300 35.411650, 138.909110 35.412420, 138.909330 35.412530, 138.909570 35.411840, 138.910390 35.411360, 138.910760 35.410830, 138.910550 35.410510, 138.909890 35.410250, 138.909900 35.409740, 138.910350 35.409450, 138.911750 35.409350, 138.912900 35.408270, 138.913800 35.408110, 138.913910 35.407820, 138.913540 35.406970, 138.913820 35.406550, 138.915560 35.405420, 138.916650 35.405030, 138.917090 35.404260, 138.918520 35.403910, 138.919560 35.402720, 138.921470 35.403500, 138.922330 35.402640, 138.923310 35.403500, 138.924050 35.403430, 138.924530 35.403050, 138.925090 35.402950, 138.926200 35.403150, 138.926350 35.402710, 138.926020 35.401740, 138.928070 35.400640, 138.929370 35.400510, 138.930320 35.400840, 138.931460 35.400800, 138.933100 35.400020, 138.935090 35.399790, 138.936670 35.398670, 138.939820 35.399470, 138.940800 35.399500, 138.942050 35.398540, 138.942150 35.397850, 138.941910 35.397380, 138.942290 35.395570, 138.942960 35.395020, 138.943120 35.394310, 138.942990 35.392420, 138.941120 35.389450, 138.941370 35.389130, 138.942210 35.389150, 138.943250 35.388730, 138.944550 35.386920, 138.946140 35.386620, 138.945790 35.386270, 138.944910 35.386300, 138.944350 35.385950, 138.942940 35.383130, 138.942720 35.381990, 138.943910 35.379310, 138.944260 35.376750, 138.943960 35.376250, 138.944070 35.375590, 138.945100 35.374170, 138.947630 35.371940)', 11346, 0.43, true, 'https://www.youtube.com/watch?v=Y4ToR1Xs92Q', 'さくら045', 'seed_auto', 'routed', 'num:県道730号:山梨', 5.00, 3.84, 3.89, 2.12, 3.19, 31)
+  on conflict (seed_key) do update set description = excluded.description, hint_scenery = excluded.hint_scenery, hint_winding = excluded.hint_winding, hint_surface = excluded.hint_surface, hint_rest = excluded.hint_rest, hint_parking = excluded.hint_parking, mention_count = excluded.mention_count, geom = excluded.geom, length_m = excluded.length_m, curviness = excluded.curviness, updated_at = now()
+  returning id)
+insert into public.road_videos (road_id, video_id, url, title, channel, view_count, timestamp_label)
+select r.id, v.video_id, v.url, v.title, v.channel, v.view_count, v.ts from r, (values
+  ('Y4ToR1Xs92Q', 'https://www.youtube.com/watch?v=Y4ToR1Xs92Q', '【バイクツーリング】神奈川Aコースをノーカットで紹介', 'さくら045', 153488, '15:39'),
+  ('o0Xj9uTQbuc', 'https://www.youtube.com/watch?v=o0Xj9uTQbuc', '【絶景】まるで阿蘇！？関東のバイク乗り聖地 道志・山中湖ツーリング｜YAMAHA SR400【モトブログ】', 'MotoNext〜 モトネクスト〜｜ツーリングなどのバイク遊びを発信！', 137065, '09:22'),
+  ('SLcZj4Ux9uU', 'https://www.youtube.com/watch?v=SLcZj4Ux9uU', '箱根・山中湖・道志みちをツーリング【ハーレー ファットボーイ】', 'イチロクのハーレーちゃんねる', 24713, '07:18'),
+  ('mCpwvnFw_MQ', 'https://www.youtube.com/watch?v=mCpwvnFw_MQ', '【関東】絶対行った方が良いツーリングスポット紹介(絶景5選＆ハプニング3選)', '平日ライダー', 21757, ''),
+  ('_CNl0fRsEGE', 'https://www.youtube.com/watch?v=_CNl0fRsEGE', '【山中湖パノラマ台】久しぶりに姿を現した富士山は神々しかった。 山中湖ツーリング 【BMW S1000RR / モトブログ 】GOPRO HERO12', 'ESPRESSO RIDER / エスプレ', 17949, '06:48'),
+  ('fuA4d2IhcYg', 'https://www.youtube.com/watch?v=fuA4d2IhcYg', '【バイク女子】山中湖ツーリング！富士五湖No.1のスケールを走ってきました🏍️✨', 'すっすのもとぶろぐ', 17628, ''),
+  ('AoPrkzTiJIs', 'https://www.youtube.com/watch?v=AoPrkzTiJIs', '【やっぱ富士山さんでしょ！】2023年最後の宿泊ツーリングはここしかない！今年の山梨も絶景だった！ | SV650', 'STOMP', 10171, ''),
+  ('gfdmBO1ZkIg', 'https://www.youtube.com/watch?v=gfdmBO1ZkIg', '[バイク旅#211 ] 日本の誇り富士山バイクツーリング　御坂峠・林道西川新倉線・河口湖・山中湖すべてで絶景　ジャパンプライドに相応しい勇姿をご視聴ください　グルメ「たちばな家」(檜原村)', 'イーザイル', 4185, ''),
+  ('01trmyw08bI', 'https://www.youtube.com/watch?v=01trmyw08bI', '【ソロ】南関東屈指の定番ツーリングコースに行ってきた! 【道志みち、山中湖、三国峠】', 'Tsuka Walker', 4094, ''),
+  ('TPDEtCJFCl8', 'https://www.youtube.com/watch?v=TPDEtCJFCl8', '【山梨バイク旅】山中湖から国道137号御坂みち経由で秘境の昇仙峡へ！山梨で出会える大自然の絶景に圧倒される1日。【HONDA Gold Wing/モトブログ】', '突然rider', 4090, ''),
+  ('fW1yYz1RSSU', 'https://www.youtube.com/watch?v=fW1yYz1RSSU', '【バイク旅】秋の訪れを感じながら箱根から富士五湖を巡る絶景とグルメツーリング！残念な結果で心が折れました。【Honda Gold Wing/モトブログ】', '突然rider', 4041, ''),
+  ('WHcjRsKx_Ek', 'https://www.youtube.com/watch?v=WHcjRsKx_Ek', '本当は教えたくない「富士五湖絶景巡り」（VITPILEN 401）', 'sharin-jin', 4030, ''),
+  ('4DtG9m5X3k8', 'https://www.youtube.com/watch?v=4DtG9m5X3k8', '【ツーリングの費用は？】冬の始まり富士山ツーリング 箱根編【CRF250RALLY】', 'chAngE', 2306, ''),
+  ('BxmA882uE8Y', 'https://www.youtube.com/watch?v=BxmA882uE8Y', '雪化粧した富士山　本栖湖、精進湖、西湖、河口湖、山中湖 富士五湖ツーリング', 'NAKAのバイキャンチャンネル', 2228, ''),
+  ('qEzOzoIwZXI', 'https://www.youtube.com/watch?v=qEzOzoIwZXI', '【モトブログ】YZF-R3初ソロツーリング富士山と雲海の絶景 First solo touring to Mt.Fuji and Cloud sea 【Motovlog】#5', '/なんてこったいHoly crap Rider', 2173, ''),
+  ('KDGd1MnWJPc', 'https://www.youtube.com/watch?v=KDGd1MnWJPc', 'カンナムスパイダー　お手軽絶景ツーリング　日帰りで三国峠、大野山を走る', 'MASAKOIスパイダーツーリング', 2159, ''),
+  ('TmniMQezdPY', 'https://www.youtube.com/watch?v=TmniMQezdPY', '絶対 バイク で行って欲しい  富士山 や街を一望 絶景ポイント 県境を一気に周れる穴場など４ヶ所紹介＃旅好きライダーチャンネル＃アフリカツイン＃富士山＃絶景ポイント＃山中湖＃誓いの丘＃大野山', '旅好きライダーチャンネル', 1291, ''),
+  ('9KBxJcb9VK4', 'https://www.youtube.com/watch?v=9KBxJcb9VK4', '【モトブログ】富士山🗻と桜🌸を撮るなら新倉山浅間公園で決まり！【SEROW250】', '軍艦巻き', 1242, '00:25'),
+  ('a71d5Wf2edE', 'https://www.youtube.com/watch?v=a71d5Wf2edE', '【モトブログ】美味しいカップラーメンの食べ方を教えます🍜🗻【SEROW250】', '軍艦巻き', 1152, '15:00'),
+  ('7FsiHJhwh3g', 'https://www.youtube.com/watch?v=7FsiHJhwh3g', '【泊まりで行く】山梨巡り旅【パート4】HONDA X4', 'MSX4 RIDER (マジェックスフォーライダー)', 1072, '05:18'),
+  ('8ksqPkd5Hsk', 'https://www.youtube.com/watch?v=8ksqPkd5Hsk', '【Ninja ZX-25R】激濃霧！絶景じゃなくても楽しい！バイク最高！【山中湖-パノラマ台-ターンパイク-伊豆スカイライン-西伊豆スカイライン-芦ノ湖スカイライン】', 'おしょじチャンネル【モトブログ】', 920, ''),
+  ('eXhqdUsesLM', 'https://www.youtube.com/watch?v=eXhqdUsesLM', '【富士山一周】絶対に行った方が良い！絶景スポット6選', '平日ライダー', 892, ''),
+  ('gAFNRsFMY7s', 'https://www.youtube.com/watch?v=gAFNRsFMY7s', '【モトブログ】黄金色の絶景！オススメのすすきスポット巡り🍂 【SEROW250】', '軍艦巻き', 738, '05:58'),
+  ('jo3rxdBTq_A', 'https://www.youtube.com/watch?v=jo3rxdBTq_A', 'バイクツーリング　あの絶景展望台がリニューアル　その神改造と問題点とは？', 'MASAKOIスパイダーツーリング', 707, ''),
+  ('4ZAWt9D16VU', 'https://www.youtube.com/watch?v=4ZAWt9D16VU', '絶景 結氷  白い 山中湖 富士山 ！ ビビった 凍結の道  パノラマ台 アフリカツイン＃アフリカツイン＃旅好きライダーチャンネル＃山中湖＃パノラマ台＃アフリカツインツーリング＃富士山＃絶景#凍結の道', '旅好きライダーチャンネル', 517, ''),
+  ('UTjCTgJHQs4', 'https://www.youtube.com/watch?v=UTjCTgJHQs4', '３月初旬の桜と富士 ゆったり日帰りソロツーリング | まつだ桜まつり2025 | W800', 'Ride with me -僕と彼女と週末に-', 506, '06:23'),
+  ('D2t-A85rcEI', 'https://www.youtube.com/watch?v=D2t-A85rcEI', '【秋のツーリング】大混雑の道の駅どうし、三国峠の絶景【モトブログ】', 'ユーシーちゃんねる【モトブログ】', 493, ''),
+  ('2flgWUPZT-U', 'https://www.youtube.com/watch?v=2flgWUPZT-U', '【ツーリング動画】ニンジャ６５０による年末年始の関東ツーリングEP４。謹賀新年。大洗から新年の富士山へ！！【モトブログ】', '榛名【はるな】のバイクで探訪記', 462, ''),
+  ('3hQ2eY_h51s', 'https://www.youtube.com/watch?v=3hQ2eY_h51s', '河口湖自動車博物館【彩雲】【零戦】レストアした貴重な飛行機は迫力満点　インスタ360フロントマウントにしてノープランツーリング', 'RIDING S【ライディング エス】', 358, ''),
+  ('aK2STNaugsg', 'https://www.youtube.com/watch?v=aK2STNaugsg', '【 ご機嫌 富士山 全方位 観る 】走って眺めて心も晴れる！明日の活力！富士山周回ツーリング＃旅好きライダーチャンネル＃富士山＃山中湖パノラマ台＃足柄峠＃富士山スカイライン＃朝霧高原＃精進湖', '旅好きライダーチャンネル', 305, ''),
+  ('3BRfly0f3RE', 'https://www.youtube.com/watch?v=3BRfly0f3RE', '【桜花見】2023年桜花見ツーリング【モトブログ】', 'ユーシーちゃんねる【モトブログ】', 199, '')
+) as v(video_id, url, title, channel, view_count, ts)
+on conflict (road_id, video_id) do nothing;
+insert into public.road_spots (road_id, name, kind, lat, lng, note, source, video_id, photo_url, photo_credit, photo_source)
+select z.id, s.name, s.kind, s.lat, s.lng, s.note, s.source, s.video_id, s.photo_url, s.photo_credit, s.photo_source from public.zekkei_roads z, (values
+  ('三国峠', 'pass', 35.405338, 138.915602, '視聴者コメントでおすすめされている景色の良い峠', 'seed_auto', 'o0Xj9uTQbuc', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/%E4%B8%89%E5%9B%BD%E5%B1%B1_-_panoramio.jpg/960px-%E4%B8%89%E5%9B%BD%E5%B1%B1_-_panoramio.jpg', 'hideki higano / CC BY-SA 3.0 / Wikimedia Commons', 'commons'),
+  ('パノラマ台', 'viewpoint', 35.412677, 138.909303, '富士山と山中湖が一望できる展望台', 'seed_auto', 'Y4ToR1Xs92Q', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8c/%E3%83%91%E3%83%8E%E3%83%A9%E3%83%9E%E5%8F%B0%E3%82%88%E3%82%8A%E5%AF%8C%E5%A3%AB%E5%B1%B1%E3%80%81%E5%B1%B1%E4%B8%AD%E6%B9%96%E3%82%92%E6%9C%9B%E3%82%80_Overlooking_Mount_Fuji%2C_Lake_Yamanaka_from_the_Panoramic_view_point_-_panoramio.jpg/960px-%E3%83%91%E3%83%8E%E3%83%A9%E3%83%9E%E5%8F%B0%E3%82%88%E3%82%8A%E5%AF%8C%E5%A3%AB%E5%B1%B1%E3%80%81%E5%B1%B1%E4%B8%AD%E6%B9%96%E3%82%92%E6%9C%9B%E3%82%80_Overlooking_Mount_Fuji%2C_Lake_Yamanaka_from_the_Panoramic_view_point_-_panoramio.jpg', 'hideki higano / CC BY-SA 3.0 / Wikimedia Commons', 'commons'),
+  ('三国山', 'viewpoint', 35.400000, 138.920000, '三国山（みくにやま）は丹沢山地の西端、神奈川県・山梨県・静岡県の境に位置する山である。', 'wikipedia', '', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/5/55/Mt.Mikuni_%28Tanzawa%29_01.jpg/960px-Mt.Mikuni_%28Tanzawa%29_01.jpg', 'Wikipedia', 'wikipedia'),
+  ('山中湖パノラマ台', 'viewpoint', 35.412677, 138.909303, '富士山と山中湖が一望できる絶景スポット', 'seed_auto', 'mCpwvnFw_MQ', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/8/86/%E5%AF%8C%E5%A3%AB%E5%85%AB%E6%99%AF_-_panoramio.jpg/960px-%E5%AF%8C%E5%A3%AB%E5%85%AB%E6%99%AF_-_panoramio.jpg', 'hideki higano / CC BY-SA 3.0 / Wikimedia Commons', 'commons'),
+  ('平野の浜', 'viewpoint', 35.424700, 138.900824, '富士山を望む山中湖畔の絶景スポット', 'seed_auto', 'o0Xj9uTQbuc', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/26/Hirano%2C_Yamanakako%2C_Minamitsuru_District%2C_Yamanashi_Prefecture_401-0502%2C_Japan_-_panoramio_%2870%29.jpg/960px-Hirano%2C_Yamanakako%2C_Minamitsuru_District%2C_Yamanashi_Prefecture_401-0502%2C_Japan_-_panoramio_%2870%29.jpg', '肖红军 / CC BY-SA 3.0 / Wikimedia Commons', 'commons')
+) as s(name, kind, lat, lng, note, source, video_id, photo_url, photo_credit, photo_source) where z.seed_key = 'num:県道730号:山梨'
 on conflict (road_id, name) do update set note = excluded.note, kind = excluded.kind, source = excluded.source, photo_url = coalesce(excluded.photo_url, road_spots.photo_url), photo_credit = coalesce(excluded.photo_credit, road_spots.photo_credit), photo_source = coalesce(excluded.photo_source, road_spots.photo_source) where road_spots.source in ('seed_auto', 'wikipedia');
 
 with r as (
