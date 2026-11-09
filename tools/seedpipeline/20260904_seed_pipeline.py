@@ -181,6 +181,35 @@ def _parse_point(text: str):
     return [lng, lat]
 
 
+def cmd_contributors(p: Pipeline, args) -> int:
+    """道の元になった動画のチャンネルを、貢献の多い順に並べる。
+    謝意を伝える相手の一覧と、紹介の声かけ先を決めるための材料"""
+    rows = p.store.contributors(args.limit)
+    if not rows:
+        print("まだ集計できる動画がありません")
+        return 1
+    total = sum(r["roads"] for r in rows)
+    print(f"チャンネル {len(rows)} 件 / 道のべ {total} 本\n")
+    print(f"{'順':>3}  {'道':>4} {'動画':>4}  チャンネル")
+    for i, r in enumerate(rows[:40], 1):
+        print(f"{i:>3}  {r['roads']:>4} {r['videos']:>4}  {r['channel']}")
+    if len(rows) > 40:
+        print(f"      … ほか {len(rows) - 40} 件")
+    if args.csv:
+        import csv
+        os.makedirs(os.path.dirname(args.csv) or ".", exist_ok=True)
+        with open(args.csv, "w", encoding="utf-8-sig", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["順位", "チャンネル名", "チャンネルID", "道の本数", "動画の本数",
+                        "最新の投稿日", "チャンネルURL"])
+            for i, r in enumerate(rows, 1):
+                url = f"https://www.youtube.com/channel/{r['channel_id']}" if r["channel_id"] else ""
+                w.writerow([i, r["channel"], r["channel_id"], r["roads"], r["videos"],
+                            (r["latest"] or "")[:10], url])
+        print(f"\nCSV → {args.csv}")
+    return 0
+
+
 def _show_road(r: dict):
     via = ", ".join(json.loads(r["via_labels"] or "[]")) or "なし"
     km = f"{(r['length_m'] or 0) / 1000:.1f} km" if r.get("length_m") else "未取得"
@@ -297,6 +326,9 @@ def main():
     rg = sub.add_parser("retry-geo", help="形状が失敗・要確認の道をやり直す"); rg.add_argument("--all", action="store_true", help="OK の道も含めて全てやり直す")
     rg.add_argument("--reason", help="失敗理由にこの文字を含む道だけに絞る（例: 近すぎ）")
     sub.add_parser("reset-roads", help="抽出結果を全て消して抽出からやり直す（動画の取得結果は残る）")
+    co = sub.add_parser("contributors", help="道の元になった動画のチャンネルを、貢献の多い順に並べる")
+    co.add_argument("--limit", type=int, default=100)
+    co.add_argument("--csv", help="CSV に書き出す先（省略すると画面に出すだけ）")
     fr = sub.add_parser("fix-road", help="実走の知見で道の始点・終点を手で直し、その 1 本だけ形状を取り直す")
     fr.add_argument("query", nargs="?", default="", help="道の名前の一部（例: パノラマ台）。--id を使うときは省略できる")
     fr.add_argument("--start", help="始点の目印に差し替える")
@@ -365,6 +397,8 @@ def main():
         print("quota:", p.store.quota())
     elif args.cmd == "retry-geo":
         log(f"{p.retry_geo(args.all, args.reason)} 本の形状をやり直し対象にしました")
+    elif args.cmd == "contributors":
+        return cmd_contributors(p, args)
     elif args.cmd == "fix-road":
         return cmd_fix_road(p, args)
     elif args.cmd == "reset-roads":

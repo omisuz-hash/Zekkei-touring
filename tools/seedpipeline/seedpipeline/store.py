@@ -371,6 +371,24 @@ class Store:
         q = f"select * from roads where geo_status in ({ph}) order by mentions desc, confidence desc"
         return [dict(r) for r in self.db.execute(q, statuses)]
 
+    def contributors(self, limit: int = 100) -> list[dict]:
+        """どのチャンネルの動画が、何本の道の元になったか。
+        形になった道（ok / suspect）だけを数える"""
+        q = """
+        select v.channel as channel, v.channel_id as channel_id,
+               count(distinct rv.road_id) as roads,
+               count(distinct v.id) as videos,
+               max(v.published_at) as latest
+          from road_videos rv
+          join videos v on v.id = rv.video_id
+          join roads  r on r.id = rv.road_id
+         where r.geo_status in ('ok', 'suspect') and coalesce(v.channel, '') <> ''
+         group by v.channel_id
+         order by roads desc, videos desc
+         limit ?
+        """
+        return [dict(r) for r in self.db.execute(q, (limit,))]
+
     def find_roads(self, query: str, limit: int = 20) -> list[dict]:
         """名前の一部で道を探す（人手で直すとき用）"""
         return [dict(r) for r in self.db.execute(
