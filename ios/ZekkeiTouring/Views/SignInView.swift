@@ -11,29 +11,44 @@ struct SignInView: View {
     @State private var nonce = ""
     @State private var isBusy = false
 
-    var body: some View {
-        ZStack(alignment: .bottom) {
-            // 背景: 暗い地図調のグラデーションと、光る 1 本の絶景道
-            LinearGradient(colors: [Color(hex: 0x1B2A20), ZK.mapBase, ZK.bg], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
-            GlowRoad().ignoresSafeArea()
-            LinearGradient(colors: [.clear, ZK.bg.opacity(0.9), ZK.bg], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+    /// 規約への同意表記。リンクを含む 1 つの文にして、狭い画面でも自然に折り返す
+    private static var termsNotice: AttributedString {
+        var text = AttributedString("続けることで 利用規約 と プライバシーポリシー に同意したものとみなします")
+        for (word, url) in [("利用規約", AppLinks.terms), ("プライバシーポリシー", AppLinks.privacy)] {
+            if let range = text.range(of: word) {
+                text[range].link = url
+                text[range].foregroundColor = ZK.accent
+            }
+        }
+        return text
+    }
 
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 14) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous).fill(ZK.primaryButtonText)
-                        RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(ZK.accent, lineWidth: 1.2)
-                        Image(systemName: "point.topleft.down.to.point.bottomright.curvepath").font(.system(size: 24, weight: .bold)).foregroundStyle(ZK.highlight)
-                    }
-                    .frame(width: 56, height: 56)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("ZEKKEI-DO").font(.zkCaption(9)).tracking(1.5).foregroundStyle(ZK.accent)
-                        Text("絶景道").font(.system(size: 30, weight: .bold)).foregroundStyle(.white)
-                    }
-                }
+    var body: some View {
+        ZStack {
+            // 背景: 暗い地図調のグラデーション。絵はアプリのしるしに任せる
+            LinearGradient(colors: [Color(hex: 0x1B2A20), ZK.mapBase, ZK.bg], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+            RadialGradient(colors: [ZK.accent.opacity(0.22), .clear], center: UnitPoint(x: 0.5, y: 0.32), startRadius: 8, endRadius: 320).ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                Spacer(minLength: 16)
+                // アプリのしるし。iOS のホーム画面と同じ角丸で出す
+                Image("AppMark")
+                    .resizable().scaledToFill()
+                    .frame(width: 148, height: 148)
+                    .clipShape(RoundedRectangle(cornerRadius: 33, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 33, style: .continuous).stroke(.white.opacity(0.14), lineWidth: 1))
+                    .shadow(color: .black.opacity(0.55), radius: 26, y: 12)
+                    .accessibilityLabel("絶景道")
+                Text("ZEKKEI-DO").font(.zkCaption(10)).tracking(2.2).foregroundStyle(ZK.accent)
+                    .padding(.top, 22)
                 Text("走って気持ちのいい道を、\nライダー同士で共有する道の口コミ地図")
                     .font(.system(size: 14)).lineSpacing(7).foregroundStyle(ZK.body)
-                Text("収集するのは名前とメールアドレスのみです").font(.system(size: 11)).foregroundStyle(ZK.caption)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 10)
+                Text("収集するのは名前とメールアドレスのみです")
+                    .font(.system(size: 11)).foregroundStyle(ZK.caption)
+                    .padding(.top, 8)
+                Spacer(minLength: 24)
 
                 SignInWithAppleButton(.signIn) { request in
                     nonce = Self.randomNonce()
@@ -45,6 +60,7 @@ struct SignInView: View {
                 .signInWithAppleButtonStyle(.white)
                 .frame(height: 52)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .padding(.bottom, 12)
 
                 Button {
                     Task { await signInWithGoogle() }
@@ -72,17 +88,15 @@ struct SignInView: View {
                         }
                     }
                 }
-                .font(.system(size: 12)).foregroundStyle(ZK.accent).frame(maxWidth: .infinity)
+                .font(.system(size: 12)).foregroundStyle(ZK.accent).frame(maxWidth: .infinity).padding(.top, 12)
                 #endif
-                HStack(spacing: 0) {
-                    Text("続けることで ").foregroundStyle(ZK.caption)
-                    Link("利用規約", destination: AppLinks.terms).foregroundStyle(ZK.accent)
-                    Text(" と ").foregroundStyle(ZK.caption)
-                    Link("プライバシーポリシー", destination: AppLinks.privacy).foregroundStyle(ZK.accent)
-                    Text(" に同意したものとみなします").foregroundStyle(ZK.caption)
-                }
-                .font(.system(size: 11)).frame(maxWidth: .infinity)
-                if isBusy { ProgressView().tint(.white).frame(maxWidth: .infinity) }
+                // 横 1 行に収まらない端末があるため、折り返せる 1 つの文として組む
+                Text(Self.termsNotice)
+                    .font(.system(size: 11)).foregroundStyle(ZK.caption)
+                    .multilineTextAlignment(.center).lineSpacing(3)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 14)
+                if isBusy { ProgressView().tint(.white).frame(maxWidth: .infinity).padding(.top, 10) }
             }
             .padding(.horizontal, 24).padding(.bottom, 32)
         }
@@ -151,23 +165,5 @@ struct SignInView: View {
 
     private static func sha256(_ s: String) -> String {
         SHA256.hash(data: Data(s.utf8)).map { String(format: "%02x", $0) }.joined()
-    }
-}
-
-/// 背景の光る道
-struct GlowRoad: View {
-    var body: some View {
-        Canvas { ctx, size in
-            var p = Path()
-            p.move(to: CGPoint(x: -20, y: size.height * 0.5))
-            p.addCurve(to: CGPoint(x: size.width * 0.55, y: size.height * 0.33),
-                       control1: CGPoint(x: size.width * 0.2, y: size.height * 0.5),
-                       control2: CGPoint(x: size.width * 0.35, y: size.height * 0.3))
-            p.addCurve(to: CGPoint(x: size.width + 20, y: size.height * 0.15),
-                       control1: CGPoint(x: size.width * 0.75, y: size.height * 0.36),
-                       control2: CGPoint(x: size.width * 0.9, y: size.height * 0.2))
-            ctx.stroke(p, with: .color(ZK.highlight.opacity(0.35)), style: StrokeStyle(lineWidth: 18, lineCap: .round))
-            ctx.stroke(p, with: .color(ZK.highlight), style: StrokeStyle(lineWidth: 5, lineCap: .round))
-        }
     }
 }
