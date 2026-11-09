@@ -9,7 +9,7 @@
   python3 20260905_db_admin.py sql "select count(*) from zekkei_roads"   任意の SQL（管理用）
   python3 20260905_db_admin.py auth      ログイン方法（Apple / Google / 匿名）の現在の設定を表示
   python3 20260905_db_admin.py auth-apply   同上を設定する（バックアップ → 適用 → 検証 → 失敗なら自動で戻す）
-  python3 20260905_db_admin.py codes        招待コードの一覧と使用状況
+  python3 20260905_db_admin.py codes --help      招待コードの一覧と使用状況（CSV にも出せる）
   python3 20260905_db_admin.py codes-new --help   招待コードを発行する（配布先ごとに 1 つ）
   python3 20260905_db_admin.py codes-set --help   発行済みのコードの期限を延ばす・停止する
 
@@ -318,24 +318,55 @@ def _new_code(prefix: str, length: int = 6) -> str:
     return prefix + "".join(secrets.choice(CODE_ALPHABET) for _ in range(length))
 
 
-def cmd_codes():
-    rows = run_sql("""
-      select code, label, kind, free_days, credits, max_redemptions, redeemed_count,
-             to_char(expires_at, 'YYYY-MM-DD') as expires, disabled
-        from public.promo_codes order by created_at desc limit 500
+def cmd_codes(argv=()):
+    """発行済みの招待コードと使用状況。配布先との対応表を出し直すのにも使う"""
+    import argparse, csv, datetime
+    ap = argparse.ArgumentParser(prog="codes", description="招待コードの一覧")
+    ap.add_argument("--note-like", help="発行時の覚え書きに、この文字を含むものだけ")
+    ap.add_argument("--label-like", help="配布先の表記に、この文字を含むものだけ")
+    ap.add_argument("--csv", nargs="?", const="", help="CSV に書き出す先（先だけ省くと out/ に日時付きで作る）")
+    args = ap.parse_args(list(argv))
+
+    wheres = ["true"]
+    if args.note_like:
+        wheres.append(f"coalesce(note, '') like {_sql_str('%' + args.note_like + '%')}")
+    if args.label_like:
+        wheres.append(f"label like {_sql_str('%' + args.label_like + '%')}")
+    rows = run_sql(f"""
+      select code, label, channel_id, kind, free_days, credits, max_redemptions, redeemed_count,
+             to_char(expires_at, 'YYYY-MM-DD') as expires, disabled, coalesce(note, '') as note
+        from public.promo_codes where {' and '.join(wheres)}
+        order by created_at, code limit 2000
     """) or []
     if not rows:
-        print("発行済みの招待コードはありません。")
+        print("当てはまる招待コードはありません。")
         return
+
+    def grant_of(r):
+        return f"{r['free_days']} 日間無料" if r["kind"] == "free_period" else f"閲覧枠 {r['credits']}"
+
     used = sum(r["redeemed_count"] for r in rows)
     print(f"招待コード {len(rows)} 件 / 使用のべ {used} 回\n")
     print(f"{'コード':<12} {'使用':>7}  {'内容':<14} {'期限':<11} 配布先")
     for r in rows:
-        grant = f"{r['free_days']} 日間無料" if r["kind"] == "free_period" else f"閲覧枠 {r['credits']}"
         mark = " (停止)" if r["disabled"] else ""
         print(f"{r['code']:<12} {r['redeemed_count']:>3}/{r['max_redemptions']:<3}  "
-              f"{grant:<14} {r['expires'] or '—':<11} {r['label']}{mark}")
+              f"{grant_of(r):<14} {r['expires'] or '—':<11} {r['label']}{mark}")
 
+    if args.csv is None:
+        return
+    out = args.csv or os.path.join(
+        HERE, "out", f"{datetime.datetime.now():%Y%m%d-%H%M}_promo_codes.csv")
+    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+    with open(out, "w", encoding="utf-8-sig", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["コード", "配布先", "チャンネルID", "内容", "使用回数", "使用上限",
+                    "有効期限", "停止", "覚え書き"])
+        for r in rows:
+            w.writerow([r["code"], r["label"], r["channel_id"] or "", grant_of(r),
+                        r["redeemed_count"], r["max_redemptions"], r["expires"] or "",
+                        "停止" if r["disabled"] else "", r["note"]])
+    print(f"\nCSV → {out}")
 
 def cmd_codes_new(argv):
     """配布先ごとに 1 つずつ招待コードを発行し、CSV に残す"""
@@ -394,7 +425,9 @@ def cmd_codes_new(argv):
             "(code, label, channel_id, kind, free_days, credits, max_redemptions, expires_at, note) values "
             + ",".join(values))
 
-    out = args.out or os.path.join(HERE, "out", f"{datetime.date.today():%Y%m%d}_promo_codes.csv")
+    # 同じ日に 2 回発行しても前の対応表を消さないよう、時刻まで入れる
+    out = args.out or os.path.join(
+        HERE, "out", f"{datetime.datetime.now():%Y%m%d-%H%M}_promo_codes.csv")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, "w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)
@@ -500,7 +533,7 @@ def run(cmd: str):
     elif cmd == "auth-apply":
         cmd_auth_apply()
     elif cmd == "codes":
-        cmd_codes()
+        cmd_codes(sys.argv[2:])
     elif cmd == "codes-new":
         cmd_codes_new(sys.argv[2:])
     elif cmd == "codes-set":
