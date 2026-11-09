@@ -38,18 +38,19 @@
   .hero img{width:104px;height:104px;border-radius:23px;border:1px solid var(--line);flex:none;
             box-shadow:0 10px 30px rgba(0,0,0,.18)}
   .hero h1{margin:0 0 6px}
-  .shots{display:flex;gap:14px;margin:18px -20px 8px;padding:0 20px 10px;overflow-x:auto;
-         scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
-  .shot{margin:0;flex:0 0 196px;scroll-snap-align:start}
-  .shot img{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:14px;
-            background:#000}
-  .shot figcaption{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.6}
+  .lead-shot{margin:18px 0 8px;text-align:center}
+  .lead-shot img{width:100%;max-width:300px;height:auto;display:block;margin:0 auto;
+                 border:1px solid var(--line);border-radius:18px;background:#000;
+                 box-shadow:0 14px 40px rgba(0,0,0,.22)}
+  .lead-shot figcaption{font-size:13px;color:var(--muted);margin-top:12px;line-height:1.7}
+  .card img{width:100%;aspect-ratio:3/4;object-fit:cover;display:block;border-radius:9px;
+            background:#000;margin:0 0 12px;border:1px solid var(--line)}
   .btn{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;font-weight:700;
        font-size:15px;padding:13px 22px;border-radius:12px;margin:4px 8px 4px 0}
   .btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
   @media (max-width:520px){.wrap{padding:36px 16px 72px}h1{font-size:24px}.cards{grid-template-columns:1fr}
     .hero{gap:14px}.hero img{width:76px;height:76px;border-radius:17px}
-    .shots{margin:16px -16px 8px;padding:0 16px 10px;gap:10px}.shot{flex:0 0 64%}}
+    .lead-shot img{max-width:260px}}
 </style>
 </head>
 <body>
@@ -65,50 +66,35 @@
 </div>
 <p class="sub">iPhone アプリ · 現在 TestFlight で先行テスト中</p>
 
-<!-- 画像が置かれていない枠は、下の onerror で自動的に消える -->
-<div class="shots">
-  <figure class="shot">
-    <img src="img/shot-map.webp" alt="地図から絶景道を探す画面" loading="lazy"
-         onerror="this.closest('figure').remove()">
-    <figcaption>地図から探す。名の知れた峠も、知られていない道も</figcaption>
-  </figure>
-  <figure class="shot">
-    <img src="img/shot-record.webp" alt="走行を記録する画面" loading="lazy"
-         onerror="this.closest('figure').remove()">
-    <figcaption>走り出す前に記録を始め、後から良かった区間だけを切り出す</figcaption>
-  </figure>
-  <figure class="shot">
-    <img src="img/shot-road.webp" alt="絶景道の詳細画面" loading="lazy"
-         onerror="this.closest('figure').remove()">
-    <figcaption>区間の形と写真。そのまま地図アプリへ渡してナビにできる</figcaption>
-  </figure>
-  <figure class="shot">
-    <img src="img/shot-spots.webp" alt="立ち寄りスポットとナビの選択画面" loading="lazy"
-         onerror="this.closest('figure').remove()">
-    <figcaption>沿線の展望台や道の駅。出発地を選んでナビへ渡せる</figcaption>
-  </figure>
-  <figure class="shot">
-    <img src="img/shot-rating.webp" alt="評価とコメントの画面" loading="lazy"
-         onerror="this.closest('figure').remove()">
-    <figcaption>5 つの観点の評価と、実際に走った人のコメント</figcaption>
-  </figure>
-</div>
+<figure class="lead-shot">
+  <img src="img/shot-rating.webp" alt="絶景道の詳細画面。評価とコメント" loading="lazy"
+       onerror="this.closest('figure').remove()">
+  <figcaption>実際に走った人の評価とコメントが、道ごとに集まる</figcaption>
+</figure>
 
 <h2>できること</h2>
 <div class="cards">
   <div class="card">
+    <img src="img/shot-map.webp" alt="地図から絶景道を探す画面" loading="lazy" style="object-position:center"
+         onerror="this.remove()">
     <h3>絶景道を探す</h3>
     <p>名の知れた峠だけでなく、知られていない気持ちのいい道を地図から探せる。絶景度・ワインディング・路面など 5 つの観点で評価されている。</p>
   </div>
   <div class="card">
+    <img src="img/shot-record.webp" alt="走行を記録する画面" loading="lazy" style="object-position:center bottom"
+         onerror="this.remove()">
     <h3>走って記録する</h3>
     <p>走行を記録し、良かった区間だけを「ここからここまで」と切り出せる。他のアプリの記録（GPX / KML / TCX）も取り込める。</p>
   </div>
   <div class="card">
+    <img src="img/shot-spots.webp" alt="立ち寄りスポットの一覧" loading="lazy" style="object-position:center bottom"
+         onerror="this.remove()">
     <h3>立ち寄りどころ</h3>
     <p>沿線の展望台・飲食店・道の駅を、写真付きで道ごとにまとめている。地図アプリへそのまま渡せる。</p>
   </div>
   <div class="card">
+    <img src="img/shot-road.webp" alt="区間の地図とナビへの受け渡し" loading="lazy" style="object-position:center top"
+         onerror="this.remove()">
     <h3>そのままナビへ</h3>
     <p>現在地から始点を経由して走り切る経路を、地図アプリに引き渡せる。走り出す前に一度開けば足りる。</p>
   </div>
