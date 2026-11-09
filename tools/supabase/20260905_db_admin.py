@@ -11,6 +11,7 @@
   python3 20260905_db_admin.py auth-apply   同上を設定する（バックアップ → 適用 → 検証 → 失敗なら自動で戻す）
   python3 20260905_db_admin.py codes        招待コードの一覧と使用状況
   python3 20260905_db_admin.py codes-new --help   招待コードを発行する（配布先ごとに 1 つ）
+  python3 20260905_db_admin.py codes-set --help   発行済みのコードの期限を延ばす・停止する
 
 接続情報は ~/.zekkei_supabase（20260905_setup_supabase.sh で作成）から読む。
 SQL の実行には Supabase の管理 API（Personal Access Token）を使う。
@@ -404,6 +405,71 @@ def cmd_codes_new(argv):
     print("※ この CSV が配布先との対応表になります。無くすと誰のコードか分からなくなります。")
 
 
+def cmd_codes_set(argv):
+    """発行済みのコードをまとめて直す。期限の延長と、停止・再開に使う"""
+    import argparse
+    ap = argparse.ArgumentParser(prog="codes-set", description="発行済みの招待コードを直す")
+    ap.add_argument("--code", help="1 つだけ指定する")
+    ap.add_argument("--note-like", help="発行時の覚え書き（--note）に、この文字を含むものを対象にする")
+    ap.add_argument("--label-like", help="配布先の表記に、この文字を含むものを対象にする")
+    ap.add_argument("--all", action="store_true", help="停止していないコード全てを対象にする")
+    ap.add_argument("--expires", help="コードの有効期限を YYYY-MM-DD に差し替える")
+    ap.add_argument("--max", type=int, help="使用回数の上限を差し替える")
+    ap.add_argument("--disable", action="store_true", help="停止する（以後は使えなくなる）")
+    ap.add_argument("--enable", action="store_true", help="停止を解除する")
+    args = ap.parse_args(argv)
+
+    wheres = []
+    if args.code:
+        wheres.append(f"code = {_sql_str(args.code.upper())}")
+    if args.note_like:
+        wheres.append(f"coalesce(note, '') like {_sql_str('%' + args.note_like + '%')}")
+    if args.label_like:
+        wheres.append(f"label like {_sql_str('%' + args.label_like + '%')}")
+    if not wheres:
+        if not args.all:
+            sys.exit("対象を指定してください（--code / --note-like / --label-like / --all）。")
+        wheres.append("not disabled")
+    where = " and ".join(wheres)
+
+    sets = []
+    if args.expires:
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", args.expires):
+            sys.exit("--expires は YYYY-MM-DD の形で指定してください。")
+        sets.append(f"expires_at = {_sql_str(args.expires)}::timestamptz")
+    if args.max is not None:
+        sets.append(f"max_redemptions = {int(args.max)}")
+    if args.disable:
+        sets.append("disabled = true")
+    if args.enable:
+        sets.append("disabled = false")
+    if not sets:
+        sys.exit("変更内容を指定してください（--expires / --max / --disable / --enable）。")
+
+    rows = run_sql(f"""
+      select code, label, redeemed_count, max_redemptions,
+             to_char(expires_at, 'YYYY-MM-DD') as expires, disabled
+        from public.promo_codes where {where} order by created_at
+    """) or []
+    if not rows:
+        print("対象のコードがありません。")
+        return
+    print(f"対象 {len(rows)} 件:")
+    for r in rows[:12]:
+        print(f"  {r['code']}  使用 {r['redeemed_count']}/{r['max_redemptions']}  "
+              f"期限 {r['expires'] or '—'}  {r['label']}")
+    if len(rows) > 12:
+        print(f"  … ほか {len(rows) - 12} 件")
+    print("\n-- これから変更する内容 --")
+    for x in sets:
+        print(f"  {x}")
+    if input("\n適用しますか（yes と入力）: ").strip() != "yes":
+        print("中止しました。変更していません。")
+        return
+    run_sql(f"update public.promo_codes set {', '.join(sets)} where {where}")
+    print(f"{len(rows)} 件を変更しました。")
+
+
 def main():
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
         print(__doc__); return
@@ -437,6 +503,8 @@ def run(cmd: str):
         cmd_codes()
     elif cmd == "codes-new":
         cmd_codes_new(sys.argv[2:])
+    elif cmd == "codes-set":
+        cmd_codes_set(sys.argv[2:])
     elif cmd == "sql":
         print(json.dumps(run_sql(sys.argv[2]), ensure_ascii=False, indent=2))
     else:
