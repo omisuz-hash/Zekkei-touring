@@ -162,6 +162,61 @@ def cmd_selftest():
     print("selftest ok")
 
 
+def _show_road(r: dict):
+    via = ", ".join(json.loads(r["via_labels"] or "[]")) or "なし"
+    km = f"{(r['length_m'] or 0) / 1000:.1f} km" if r.get("length_m") else "未取得"
+    print(f"  [{r['id']}] {r['name']}（{r['prefecture']}）")
+    print(f"      始点: {r['start_label']} / 終点: {r['end_label']} / 経由: {via}")
+    print(f"      想定 {r['approx_length_km'] or '—'} km / 経路 {km} / 状態 {r['geo_status']}"
+          + (f" ({r['geo_error']})" if r.get("geo_error") else ""))
+
+
+def cmd_fix_road(p: Pipeline, args) -> int:
+    """実走して分かった正しい区間を手で入れ、その 1 本だけ地図 API に問い直す。
+
+    直す指定が無ければ、候補を並べて見せるだけで終わる（まず確認してから直せる）"""
+    found = [p.store.road(args.id)] if args.id else p.store.find_roads(args.query)
+    found = [r for r in found if r]
+    if not found:
+        print(f"「{args.query}」に当たる道がありません")
+        return 1
+    edits = {k: getattr(args, k) for k in ("start", "end", "via", "km", "pref")}
+    if not any(v is not None for v in edits.values()):
+        print(f"候補 {len(found)} 本:")
+        for r in found:
+            _show_road(r)
+        print("\n直すときは --start / --end / --via / --km を付けてください（同名が複数なら --id も）")
+        return 0
+    if len(found) > 1:
+        print(f"候補が {len(found)} 本あります。--id で 1 本に絞ってください:")
+        for r in found:
+            _show_road(r)
+        return 1
+
+    r = found[0]
+    print("変更前:")
+    _show_road(r)
+    via = json.loads(r["via_labels"] or "[]")
+    if args.via is not None:
+        via = [v.strip() for v in args.via.split(",") if v.strip()]
+    fix = {
+        "start_label": args.start or r["start_label"],
+        "start_municipality": r["start_municipality"] or "",
+        "end_label": args.end or r["end_label"],
+        "end_municipality": r["end_municipality"] or "",
+        "via_labels": via,
+        "approx_length_km": args.km if args.km is not None else r["approx_length_km"],
+        "prefecture": args.pref or "",
+    }
+    p.store.apply_repair(r["id"], fix)
+    after = p.geo_one(r["id"])
+    print("変更後:")
+    if after:
+        _show_road(after)
+    print("\n反映するには export してから、出力された SQL を Supabase に適用してください")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description="絶景道シード自動収集")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -195,6 +250,14 @@ def main():
     rg = sub.add_parser("retry-geo", help="形状が失敗・要確認の道をやり直す"); rg.add_argument("--all", action="store_true", help="OK の道も含めて全てやり直す")
     rg.add_argument("--reason", help="失敗理由にこの文字を含む道だけに絞る（例: 近すぎ）")
     sub.add_parser("reset-roads", help="抽出結果を全て消して抽出からやり直す（動画の取得結果は残る）")
+    fr = sub.add_parser("fix-road", help="実走の知見で道の始点・終点を手で直し、その 1 本だけ形状を取り直す")
+    fr.add_argument("query", help="道の名前の一部（例: パノラマ台）")
+    fr.add_argument("--start", help="始点の目印に差し替える")
+    fr.add_argument("--end", help="終点の目印に差し替える")
+    fr.add_argument("--via", help="経由地をカンマ区切りで差し替える（空文字で全て外す）")
+    fr.add_argument("--km", type=float, help="想定の距離（km）。経路がこれと大きく食い違うと要確認になる")
+    fr.add_argument("--pref", help="都道府県を差し替える")
+    fr.add_argument("--id", type=int, help="同名が複数あるときに id で選ぶ")
     args = ap.parse_args()
 
     if args.cmd == "selftest":
@@ -253,6 +316,8 @@ def main():
         print("quota:", p.store.quota())
     elif args.cmd == "retry-geo":
         log(f"{p.retry_geo(args.all, args.reason)} 本の形状をやり直し対象にしました")
+    elif args.cmd == "fix-road":
+        return cmd_fix_road(p, args)
     elif args.cmd == "reset-roads":
         log(f"{p.reset_roads()} 本の道を消し、動画を抽出前に戻しました")
     elif args.cmd == "retry-failed":

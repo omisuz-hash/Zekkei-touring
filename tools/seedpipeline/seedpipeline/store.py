@@ -371,6 +371,16 @@ class Store:
         q = f"select * from roads where geo_status in ({ph}) order by mentions desc, confidence desc"
         return [dict(r) for r in self.db.execute(q, statuses)]
 
+    def find_roads(self, query: str, limit: int = 20) -> list[dict]:
+        """名前の一部で道を探す（人手で直すとき用）"""
+        return [dict(r) for r in self.db.execute(
+            "select * from roads where name like ? order by mentions desc, confidence desc limit ?",
+            (f"%{query}%", limit))]
+
+    def road(self, road_id: int) -> dict | None:
+        r = self.db.execute("select * from roads where id=?", (road_id,)).fetchone()
+        return dict(r) if r else None
+
     def roads_to_repair(self, limit: int, min_mentions: int = 1) -> list[dict]:
         """言い直しの対象。言及の多い道は 2 回まで試す（林道など確度の低い層も拾えるよう下限を下げた）"""
         return [dict(r) for r in self.db.execute(
