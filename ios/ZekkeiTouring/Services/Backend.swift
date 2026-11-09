@@ -20,6 +20,8 @@ protocol Backend: AnyObject {
     func updatePrivacyZone(center: CLLocationCoordinate2D?, radiusMeters: Int) async throws
     /// アイコンを設定する（保管場所の中の位置。nil で解除）
     func setAvatarPath(_ path: String?) async throws
+    /// 招待コードを使う
+    func redeemCode(_ code: String) async throws -> RedeemResult
 
     func nearbyRoads(center: CLLocationCoordinate2D, radiusMeters: Double, limit: Int) async throws -> [ZekkeiRoad]
     func road(id: UUID) async throws -> ZekkeiRoad?
@@ -137,6 +139,10 @@ final class MockBackend: Backend {
     }
 
     func setAvatarPath(_ path: String?) async throws {}
+
+    func redeemCode(_ code: String) async throws -> RedeemResult {
+        RedeemResult(ok: false, message: "テスト用データでは招待コードを使えません", kind: nil, freeUntil: nil, balance: balance)
+    }
 
     @discardableResult func deleteMyContribution(roadId: UUID) async throws -> Bool {
         ratingsByRoad[roadId] = nil

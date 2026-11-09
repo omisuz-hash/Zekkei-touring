@@ -9,6 +9,8 @@
   python3 20260905_db_admin.py sql "select count(*) from zekkei_roads"   任意の SQL（管理用）
   python3 20260905_db_admin.py auth      ログイン方法（Apple / Google / 匿名）の現在の設定を表示
   python3 20260905_db_admin.py auth-apply   同上を設定する（バックアップ → 適用 → 検証 → 失敗なら自動で戻す）
+  python3 20260905_db_admin.py codes        招待コードの一覧と使用状況
+  python3 20260905_db_admin.py codes-new --help   招待コードを発行する（配布先ごとに 1 つ）
 
 接続情報は ~/.zekkei_supabase（20260905_setup_supabase.sh で作成）から読む。
 SQL の実行には Supabase の管理 API（Personal Access Token）を使う。
@@ -296,6 +298,112 @@ def cmd_auth_apply():
     print("\n完了しました。iPhone でアプリを開き直してログインを試してください。")
 
 
+# ---------------------------------------------------------------
+# 招待コード
+# ---------------------------------------------------------------
+# 紛らわしい字（0/O、1/I/L）を外した英数字。口頭でも伝えられるようにする
+CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def _sql_str(v) -> str:
+    """SQL の文字列リテラルにする（None は null）"""
+    if v is None or v == "":
+        return "null"
+    return "'" + str(v).replace("'", "''") + "'"
+
+
+def _new_code(prefix: str, length: int = 6) -> str:
+    import secrets
+    return prefix + "".join(secrets.choice(CODE_ALPHABET) for _ in range(length))
+
+
+def cmd_codes():
+    rows = run_sql("""
+      select code, label, kind, free_days, credits, max_redemptions, redeemed_count,
+             to_char(expires_at, 'YYYY-MM-DD') as expires, disabled
+        from public.promo_codes order by created_at desc limit 500
+    """) or []
+    if not rows:
+        print("発行済みの招待コードはありません。")
+        return
+    used = sum(r["redeemed_count"] for r in rows)
+    print(f"招待コード {len(rows)} 件 / 使用のべ {used} 回\n")
+    print(f"{'コード':<12} {'使用':>7}  {'内容':<14} {'期限':<11} 配布先")
+    for r in rows:
+        grant = f"{r['free_days']} 日間無料" if r["kind"] == "free_period" else f"閲覧枠 {r['credits']}"
+        mark = " (停止)" if r["disabled"] else ""
+        print(f"{r['code']:<12} {r['redeemed_count']:>3}/{r['max_redemptions']:<3}  "
+              f"{grant:<14} {r['expires'] or '—':<11} {r['label']}{mark}")
+
+
+def cmd_codes_new(argv):
+    """配布先ごとに 1 つずつ招待コードを発行し、CSV に残す"""
+    import argparse, csv, datetime
+    ap = argparse.ArgumentParser(prog="codes-new", description="招待コードを発行する")
+    ap.add_argument("--from-csv", help="配布先の一覧。seedpipeline の contributors が出す CSV を想定")
+    ap.add_argument("--label", help="配布先を 1 つだけ指定する（--from-csv の代わり）")
+    ap.add_argument("--limit", type=int, default=30, help="--from-csv のとき、上位何件に出すか")
+    ap.add_argument("--kind", choices=["free_period", "credits"], default="free_period")
+    ap.add_argument("--days", type=int, default=365, help="free_period のとき、無料にする日数")
+    ap.add_argument("--credits", type=int, default=30, help="credits のとき、付与する閲覧枠の数")
+    ap.add_argument("--max", type=int, default=1, help="1 つのコードを使える回数の上限")
+    ap.add_argument("--expires", help="コード自体の有効期限 YYYY-MM-DD（既定は 180 日後）")
+    ap.add_argument("--prefix", default="ZD", help="コードの頭に付ける文字")
+    ap.add_argument("--note", default="", help="控えとして残す覚え書き")
+    ap.add_argument("--out", help="発行結果の CSV。既定は out/<日付>_promo_codes.csv")
+    args = ap.parse_args(argv)
+
+    targets = []
+    if args.from_csv:
+        with open(args.from_csv, encoding="utf-8-sig") as f:
+            for row in list(csv.DictReader(f))[:args.limit]:
+                targets.append((row.get("チャンネル名") or row.get("label") or "",
+                                row.get("チャンネルID") or row.get("channel_id") or ""))
+    elif args.label:
+        targets.append((args.label, ""))
+    else:
+        sys.exit("--from-csv か --label のどちらかを指定してください。")
+    targets = [(name.strip(), cid.strip()) for name, cid in targets if name.strip()]
+    if not targets:
+        sys.exit("配布先が 1 件もありません。")
+
+    expires = args.expires or (datetime.date.today() + datetime.timedelta(days=180)).isoformat()
+    grant = f"{args.days} 日間の閲覧無制限" if args.kind == "free_period" else f"閲覧枠 {args.credits} つ"
+    print(f"配布先 {len(targets)} 件に、{grant} のコードを発行します。")
+    print(f"  1 コードあたりの使用上限: {args.max} 回 / コードの有効期限: {expires}")
+    for name, _ in targets[:10]:
+        print(f"    - {name}")
+    if len(targets) > 10:
+        print(f"    … ほか {len(targets) - 10} 件")
+    if input("\n発行しますか（yes と入力）: ").strip() != "yes":
+        print("中止しました。")
+        return
+
+    issued = []
+    values = []
+    for name, cid in targets:
+        code = _new_code(args.prefix)
+        issued.append((code, name, cid))
+        values.append("({}, {}, {}, {}, {}, {}, {}, {}, {})".format(
+            _sql_str(code), _sql_str(name), _sql_str(cid), _sql_str(args.kind),
+            args.days if args.kind == "free_period" else "null",
+            args.credits if args.kind == "credits" else "null",
+            args.max, _sql_str(expires), _sql_str(args.note)))
+    run_sql("insert into public.promo_codes"
+            "(code, label, channel_id, kind, free_days, credits, max_redemptions, expires_at, note) values "
+            + ",".join(values))
+
+    out = args.out or os.path.join(HERE, "out", f"{datetime.date.today():%Y%m%d}_promo_codes.csv")
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with open(out, "w", encoding="utf-8-sig", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["コード", "配布先", "チャンネルID", "内容", "使用上限", "有効期限"])
+        for code, name, cid in issued:
+            w.writerow([code, name, cid, grant, args.max, expires])
+    print(f"発行しました: {len(issued)} 件\nCSV → {out}")
+    print("※ この CSV が配布先との対応表になります。無くすと誰のコードか分からなくなります。")
+
+
 def main():
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
         print(__doc__); return
@@ -325,6 +433,10 @@ def run(cmd: str):
         cmd_auth()
     elif cmd == "auth-apply":
         cmd_auth_apply()
+    elif cmd == "codes":
+        cmd_codes()
+    elif cmd == "codes-new":
+        cmd_codes_new(sys.argv[2:])
     elif cmd == "sql":
         print(json.dumps(run_sql(sys.argv[2]), ensure_ascii=False, indent=2))
     else:

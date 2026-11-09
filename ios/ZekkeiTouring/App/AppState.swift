@@ -130,7 +130,7 @@ final class AppState: ObservableObject {
     }
 
     func isUnlocked(_ road: ZekkeiRoad) -> Bool {
-        profile?.plan == .subscriber || unlockedRoadIds.contains(road.id)
+        profile?.hasUnlimitedViewing == true || unlockedRoadIds.contains(road.id)
     }
 
     /// 閲覧枠を消費して絶景道を解放する。成功したら true

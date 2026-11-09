@@ -263,7 +263,7 @@ struct CreditBadge: View {
     var body: some View {
         VStack(spacing: 1) {
             CaptionLabel(text: "閲覧枠", size: 8)
-            if app.profile?.plan == .subscriber {
+            if app.profile?.hasUnlimitedViewing == true {
                 Image(systemName: "infinity").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
             } else {
                 Text("\(app.creditBalance)").font(.zkNumber(17)).foregroundStyle(.white)

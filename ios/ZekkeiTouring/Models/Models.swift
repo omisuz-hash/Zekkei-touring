@@ -574,17 +574,40 @@ struct Profile: Codable, Identifiable {
     var displayName: String
     var avatarUrl: String?
     var plan: Plan
+    /// 招待コードで付いた、期間付きの閲覧無制限の期限
+    var subscriberUntil: Date?
     /// 本人がニックネームを決めたか（未設定なら自動割り当ての仮名）
     var displayNameSet: Bool?
 
     var needsNickname: Bool { displayNameSet != true }
+
+    /// 課金と招待コードのどちらでも、枠なしで見られる状態
+    var hasUnlimitedViewing: Bool {
+        plan == .subscriber || (subscriberUntil.map { $0 > Date() } ?? false)
+    }
 
     enum CodingKeys: String, CodingKey {
         case id
         case displayName = "display_name"
         case avatarUrl = "avatar_url"
         case plan
+        case subscriberUntil = "subscriber_until"
         case displayNameSet = "display_name_set"
+    }
+}
+
+/// 招待コードを使った結果
+struct RedeemResult: Codable {
+    var ok: Bool
+    var message: String
+    var kind: String?
+    var freeUntil: Date?
+    var balance: Int
+
+    enum CodingKeys: String, CodingKey {
+        case ok, message, kind
+        case freeUntil = "free_until"
+        case balance
     }
 }
 

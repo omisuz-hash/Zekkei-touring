@@ -56,6 +56,13 @@ final class SupabaseBackend: Backend {
         return rows.first
     }
 
+    func redeemCode(_ code: String) async throws -> RedeemResult {
+        _ = try requireUser()
+        let rows: [RedeemResult] = try await client.rpc("redeem_code", params: ["p_code": code]).execute().value
+        guard let first = rows.first else { throw BackendError.notSignedIn }
+        return first
+    }
+
     func deleteAccount() async throws {
         _ = try requireUser()
         try await client.rpc("delete_account").execute()

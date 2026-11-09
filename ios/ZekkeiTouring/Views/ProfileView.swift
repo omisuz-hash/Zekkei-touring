@@ -13,6 +13,7 @@ struct ProfileView: View {
     @State private var showNickname = false
     @State private var showRegion = false
     @State private var showDeleteConfirm = false
+    @State private var showRedeem = false
     @State private var isDeleting = false
 
     var body: some View {
@@ -34,7 +35,7 @@ struct ProfileView: View {
                                        name: app.profile?.displayName ?? "？", size: 48)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(app.isSignedIn ? (app.profile?.displayName ?? "ライダー") : "ログイン").font(.system(size: 17, weight: .bold)).foregroundStyle(.white)
-                                Text(app.isSignedIn ? (app.profile?.plan == .subscriber ? "月額プラン" : "投稿コース") : "Apple または Google で").font(.system(size: 13)).foregroundStyle(ZK.caption)
+                                Text(planCaption).font(.system(size: 13)).foregroundStyle(ZK.caption)
                             }
                             Spacer()
                             Image(systemName: "chevron.right").foregroundStyle(ZK.caption)
@@ -124,13 +125,13 @@ struct ProfileView: View {
                         HStack(alignment: .top, spacing: 16) {
                             VStack(alignment: .leading, spacing: 2) {
                                 CaptionLabel(text: "残り")
-                                if app.profile?.plan == .subscriber {
+                                if app.profile?.hasUnlimitedViewing == true {
                                     Image(systemName: "infinity").font(.system(size: 34, weight: .bold)).foregroundStyle(ZK.highlight)
                                 } else {
                                     Text("\(app.creditBalance)").font(.zkNumber(40)).foregroundStyle(ZK.highlight)
                                 }
                             }
-                            Text("道の詳細を 1 本見るごとに 1 つ使います。絶景道を 1 本投稿すると 3 つ増えます。")
+                            Text(creditNote)
                                 .font(.system(size: 12)).lineSpacing(5).foregroundStyle(ZK.body)
                         }
                         .padding(16)
@@ -143,6 +144,15 @@ struct ProfileView: View {
                             Text("準備中").font(.system(size: 11, weight: .semibold)).foregroundStyle(ZK.caption)
                         }
                         .padding(16)
+                        Divider().overlay(ZK.divider)
+                        Button { if app.isSignedIn { showRedeem = true } else { showSignIn = true } } label: {
+                            HStack {
+                                Text("招待コードを使う").font(.system(size: 15)).foregroundStyle(.white)
+                                Spacer()
+                                Image(systemName: "chevron.right").foregroundStyle(ZK.caption)
+                            }
+                            .padding(16)
+                        }
                     }
                     .innerGroup(radius: 16)
 
@@ -183,6 +193,7 @@ struct ProfileView: View {
             .sheet(isPresented: $showSignIn) { SignInView() }
             .sheet(isPresented: $showNickname) { NicknameView() }
             .sheet(isPresented: $showRegion) { RegionPickerView() }
+            .sheet(isPresented: $showRedeem) { RedeemCodeView().environmentObject(app) }
             // 走行記録は端末にしか無く、ログインしていなくても使える。
             // アカウントを消したときに道連れにするかは、利用者に選ばせる
             .confirmationDialog("アカウントを削除しますか", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
@@ -222,6 +233,31 @@ struct ProfileView: View {
 }
 
 extension ProfileView {
+    /// アカウント欄の肩書き
+    var planCaption: String {
+        guard app.isSignedIn else { return "Apple または Google で" }
+        if app.profile?.plan == .subscriber { return "月額プラン" }
+        if let until = app.profile?.subscriberUntil, until > Date() {
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "ja_JP")
+            f.dateFormat = "y年M月d日"
+            return "無料期間中 · \(f.string(from: until)) まで"
+        }
+        return "投稿コース"
+    }
+
+    /// 閲覧枠の説明
+    var creditNote: String {
+        if app.profile?.plan == .subscriber { return "月額プランのため、枠を使わずに全ての詳細を見られます。" }
+        if let until = app.profile?.subscriberUntil, until > Date() {
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "ja_JP")
+            f.dateFormat = "y年M月d日"
+            return "招待コードの無料期間中です。\(f.string(from: until)) までは枠を使わずに見られます。"
+        }
+        return "道の詳細を 1 本見るごとに 1 つ使います。絶景道を 1 本投稿すると 3 つ増えます。"
+    }
+
     var avatarNote: String {
         app.profile?.avatarUrl?.isEmpty == false ? "写真を選び直せます" : "自分のバイクの写真などを目印に"
     }
