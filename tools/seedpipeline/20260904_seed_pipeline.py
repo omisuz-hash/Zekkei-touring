@@ -175,10 +175,13 @@ def cmd_fix_road(p: Pipeline, args) -> int:
     """実走して分かった正しい区間を手で入れ、その 1 本だけ地図 API に問い直す。
 
     直す指定が無ければ、候補を並べて見せるだけで終わる（まず確認してから直せる）"""
+    if not args.id and not args.query:
+        print("道の名前の一部か、--id のどちらかを指定してください")
+        return 1
     found = [p.store.road(args.id)] if args.id else p.store.find_roads(args.query)
     found = [r for r in found if r]
     if not found:
-        print(f"「{args.query}」に当たる道がありません")
+        print(f"「{args.query or args.id}」に当たる道がありません")
         return 1
     edits = {k: getattr(args, k) for k in ("start", "end", "via", "km", "pref")}
     if not any(v is not None for v in edits.values()):
@@ -258,7 +261,7 @@ def main():
     rg.add_argument("--reason", help="失敗理由にこの文字を含む道だけに絞る（例: 近すぎ）")
     sub.add_parser("reset-roads", help="抽出結果を全て消して抽出からやり直す（動画の取得結果は残る）")
     fr = sub.add_parser("fix-road", help="実走の知見で道の始点・終点を手で直し、その 1 本だけ形状を取り直す")
-    fr.add_argument("query", help="道の名前の一部（例: パノラマ台）")
+    fr.add_argument("query", nargs="?", default="", help="道の名前の一部（例: パノラマ台）。--id を使うときは省略できる")
     fr.add_argument("--start", help="始点の目印に差し替える")
     fr.add_argument("--end", help="終点の目印に差し替える")
     fr.add_argument("--via", help="経由地をカンマ区切りで差し替える（空文字で全て外す）")
