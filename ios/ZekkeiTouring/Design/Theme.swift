@@ -1,4 +1,5 @@
 import SwiftUI
+import MapKit
 
 // MARK: - 配色（デザイン v2 ダーク。docs/design/20260905_v2_dark を正とする）
 
@@ -94,6 +95,11 @@ extension View {
         modifier(GlassCard(radius: radius, padding: padding))
     }
     /// 小物用のガラス（検索バー、ボタン、ピル）
+    /// 利用者が選んだ地図の見た目を当てる
+    func zkMapStyle(_ look: MapLook, elevation: MapStyle.Elevation = .realistic) -> some View {
+        mapStyle(look == .hybrid ? .hybrid(elevation: elevation) : .standard(elevation: elevation))
+    }
+
     func glassPill(radius: CGFloat = 14) -> some View {
         self.background(ZK.glass)
             .background(.ultraThinMaterial.opacity(0.5))

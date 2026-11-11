@@ -3,6 +3,11 @@ import MapKit
 
 /// 記録（屋外・グローブ操作）
 struct RecordView: View {
+    @AppStorage(MapLook.key) private var mapLookRaw = MapLook.hybrid.rawValue
+    private var mapLook: MapLook { MapLook(rawValue: mapLookRaw) ?? .hybrid }
+    /// 走行中は進行方向を上にした方が、今どちらへ向かっているかが分かりやすい
+    @AppStorage("map.headingUp") private var headingUp = false
+
     @EnvironmentObject private var app: AppState
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
     @State private var finishedRide: RideLog?
@@ -21,7 +26,7 @@ struct RecordView: View {
                         MapPolyline(coordinates: recorder.points.map(\.coordinate)).stroke(ZK.highlight, lineWidth: 4)
                     }
                 }
-                .mapStyle(.hybrid(elevation: .realistic))
+                .zkMapStyle(mapLook)
                 .mapControls { MapUserLocationButton(); MapCompass() }
                 .ignoresSafeArea()
 
@@ -33,14 +38,47 @@ struct RecordView: View {
 
                 VStack {
                     Spacer()
+                    HStack(spacing: 8) {
+                        mapPill(symbol: mapLook.next.symbol, text: mapLook.next.title) {
+                            mapLookRaw = mapLook.next.rawValue
+                        }
+                        mapPill(symbol: headingUp ? "arrow.up" : "location.north.line.fill",
+                                text: headingUp ? "北を上" : "進行方向を上") {
+                            headingUp.toggle()
+                            applyCamera()
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 14).padding(.bottom, 8)
                     card.padding(.horizontal, 10).padding(.bottom, 10)
                 }
             }
             .navigationBarHidden(true)
             .navigationDestination(item: $finishedRide) { ride in TrimView(ride: ride) }
             .onReceive(timer) { tick = $0 }
+            .onAppear { applyCamera() }
         }
         .preferredColorScheme(.dark)
+    }
+
+    /// 地図の上に置く小さな切り替えボタン
+    private func mapPill(symbol: String, text: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: symbol).font(.system(size: 12, weight: .semibold))
+                Text(text).font(.system(size: 12, weight: .medium))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12).frame(height: 34).glassPill(radius: 999)
+        }
+    }
+
+    /// 進行方向を上にするかどうかを地図に反映する
+    private func applyCamera() {
+        withAnimation {
+            position = headingUp ? .userLocation(followsHeading: true, fallback: .automatic)
+                                 : .userLocation(fallback: .automatic)
+        }
     }
 
     private var card: some View {

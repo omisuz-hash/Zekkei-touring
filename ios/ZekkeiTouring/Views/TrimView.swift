@@ -3,6 +3,9 @@ import MapKit
 
 /// 区間の切り出し
 struct TrimView: View {
+    @AppStorage(MapLook.key) private var mapLookRaw = MapLook.hybrid.rawValue
+    private var mapLook: MapLook { MapLook(rawValue: mapLookRaw) ?? .hybrid }
+
     @EnvironmentObject private var app: AppState
     @Environment(\.dismiss) private var dismiss
     let ride: RideLog
@@ -63,7 +66,7 @@ struct TrimView: View {
                     Annotation("プライバシーゾーン · 自動除外", coordinate: c) { EmptyView() }
                 }
             }
-            .mapStyle(.hybrid(elevation: .realistic))
+            .zkMapStyle(mapLook)
             .ignoresSafeArea()
 
             HStack(spacing: 8) {

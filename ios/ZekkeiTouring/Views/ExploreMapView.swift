@@ -3,6 +3,9 @@ import MapKit
 
 /// 探す: 衛星調ダーク地図に絶景道を重ねる
 struct ExploreMapView: View {
+    @AppStorage(MapLook.key) private var mapLookRaw = MapLook.hybrid.rawValue
+    private var mapLook: MapLook { MapLook(rawValue: mapLookRaw) ?? .hybrid }
+
     @EnvironmentObject private var app: AppState
     /// 初期位置は既定の地域。表示後は地図の移動に従う
     @State private var position: MapCameraPosition = .region(Region.stored.mapRegion)
@@ -56,7 +59,7 @@ struct ExploreMapView: View {
                     }
                 }
             }
-            .mapStyle(.hybrid(elevation: .realistic))
+            .zkMapStyle(mapLook)
             .mapControls { MapCompass() }
             .onMapCameraChange(frequency: .onEnd) { ctx in
                 spanLat = ctx.region.span.latitudeDelta
@@ -102,6 +105,14 @@ struct ExploreMapView: View {
                         }
                     }
                     .glassPill(radius: 14)
+                    .padding(.trailing, 8)
+                    // 航空写真と道路地図の切り替え。道の形や地名を読みたい場面がある
+                    Button { mapLookRaw = mapLook.next.rawValue } label: {
+                        Image(systemName: mapLook.next.symbol)
+                            .font(.system(size: 17, weight: .semibold)).foregroundStyle(.white)
+                            .frame(width: 44, height: 44).glassPill(radius: 14)
+                    }
+                    .accessibilityLabel("\(mapLook.next.title)に切り替える")
                     .padding(.trailing, 8)
                     Button {
                         app.recorder.requestPermission()

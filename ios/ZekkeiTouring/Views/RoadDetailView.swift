@@ -4,6 +4,9 @@ import AVKit
 
 /// 道の詳細（未解放 → 解放）
 struct RoadDetailView: View {
+    @AppStorage(MapLook.key) private var mapLookRaw = MapLook.hybrid.rawValue
+    private var mapLook: MapLook { MapLook(rawValue: mapLookRaw) ?? .hybrid }
+
     @EnvironmentObject private var app: AppState
     @Environment(\.dismiss) private var dismiss
     @State var road: ZekkeiRoad
@@ -182,7 +185,7 @@ struct RoadDetailView: View {
                         .annotationTitles(.hidden)
                 }
             }
-            .mapStyle(.hybrid(elevation: .flat))
+            .zkMapStyle(mapLook, elevation: .flat)
             .mapControlVisibility(.hidden)
             .allowsHitTesting(false)
             .frame(height: heroImageURL == nil ? 220 : 160)

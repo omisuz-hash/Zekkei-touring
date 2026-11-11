@@ -390,9 +390,11 @@ struct RoadSpot: Codable, Identifiable, Hashable {
         let coord = String(format: "%.6f,%.6f", lat, lng)
         let byCoordinate = URL(string: "https://www.google.com/maps/search/?api=1&query=\(coord)")
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        // place/ で渡すと、Google 側で実在の地点に結び付かない「名前だけの表示」になる。
+        // その状態では保存しても地点として残らないため、周辺を指定した検索として渡す
         guard !trimmed.isEmpty,
               let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .alphanumerics),
-              let url = URL(string: "https://www.google.com/maps/place/\(encoded)/@\(coord),16z")
+              let url = URL(string: "https://www.google.com/maps/search/\(encoded)/@\(coord),16z")
         else { return byCoordinate }
         return url
     }
@@ -430,6 +432,23 @@ struct RoadVideo: Codable, Identifiable, Hashable {
 }
 
 // MARK: - 評価
+
+/// 地図の見た目。衛星写真は景色が分かり、地図は道の形と地名が読みやすい
+enum MapLook: String, CaseIterable, Identifiable {
+    case hybrid    // 航空写真 + 地名
+    case standard  // 道路地図
+
+    var id: String { rawValue }
+    var title: String { self == .hybrid ? "航空写真" : "地図" }
+    var symbol: String { self == .hybrid ? "globe.asia.australia.fill" : "map.fill" }
+    var next: MapLook { self == .hybrid ? .standard : .hybrid }
+
+    static let key = "map.look"
+    static var stored: MapLook {
+        get { MapLook(rawValue: UserDefaults.standard.string(forKey: key) ?? "") ?? .hybrid }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: key) }
+    }
+}
 
 enum RatingAxis: String, CaseIterable, Identifiable {
     case scenery, rideQuality, winding, restStops, parking
