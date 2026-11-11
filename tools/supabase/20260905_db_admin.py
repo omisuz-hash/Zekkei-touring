@@ -12,6 +12,7 @@
   python3 20260905_db_admin.py codes --help      招待コードの一覧と使用状況（CSV にも出せる）
   python3 20260905_db_admin.py codes-new --help   招待コードを発行する（配布先ごとに 1 つ）
   python3 20260905_db_admin.py codes-set --help   発行済みのコードの期限を延ばす・停止する
+  python3 20260905_db_admin.py outreach --help    送付先一覧と 1 通ずつの文面を書き出す
 
 接続情報は ~/.zekkei_supabase（20260905_setup_supabase.sh で作成）から読む。
 SQL の実行には Supabase の管理 API（Personal Access Token）を使う。
@@ -334,7 +335,8 @@ def cmd_codes(argv=()):
         wheres.append(f"label like {_sql_str('%' + args.label_like + '%')}")
     rows = run_sql(f"""
       select code, label, channel_id, kind, free_days, credits, max_redemptions, redeemed_count,
-             to_char(expires_at, 'YYYY-MM-DD') as expires, disabled, coalesce(note, '') as note
+             to_char(expires_at, 'YYYY-MM-DD') as expires,
+             to_char(sent_at, 'YYYY-MM-DD') as sent, disabled, coalesce(note, '') as note
         from public.promo_codes where {' and '.join(wheres)}
         order by created_at, code limit 2000
     """) or []
@@ -361,11 +363,11 @@ def cmd_codes(argv=()):
     with open(out, "w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)
         w.writerow(["コード", "配布先", "チャンネルID", "内容", "使用回数", "使用上限",
-                    "有効期限", "停止", "覚え書き"])
+                    "有効期限", "送付日", "停止", "覚え書き"])
         for r in rows:
             w.writerow([r["code"], r["label"], r["channel_id"] or "", grant_of(r),
                         r["redeemed_count"], r["max_redemptions"], r["expires"] or "",
-                        "停止" if r["disabled"] else "", r["note"]])
+                        r["sent"] or "", "停止" if r["disabled"] else "", r["note"]])
     print(f"\nCSV → {out}")
 
 def cmd_codes_new(argv):
@@ -448,6 +450,8 @@ def cmd_codes_set(argv):
     ap.add_argument("--all", action="store_true", help="停止していないコード全てを対象にする")
     ap.add_argument("--expires", help="コードの有効期限を YYYY-MM-DD に差し替える")
     ap.add_argument("--max", type=int, help="使用回数の上限を差し替える")
+    ap.add_argument("--sent", nargs="?", const="today", help="送付済みにする（日付 YYYY-MM-DD、省略で本日）")
+    ap.add_argument("--unsent", action="store_true", help="送付の記録を消す")
     ap.add_argument("--disable", action="store_true", help="停止する（以後は使えなくなる）")
     ap.add_argument("--enable", action="store_true", help="停止を解除する")
     args = ap.parse_args(argv)
@@ -472,12 +476,21 @@ def cmd_codes_set(argv):
         sets.append(f"expires_at = {_sql_str(args.expires)}::timestamptz")
     if args.max is not None:
         sets.append(f"max_redemptions = {int(args.max)}")
+    if args.sent:
+        if args.sent == "today":
+            sets.append("sent_at = now()")
+        elif re.fullmatch(r"\d{4}-\d{2}-\d{2}", args.sent):
+            sets.append(f"sent_at = {_sql_str(args.sent)}::timestamptz")
+        else:
+            sys.exit("--sent は YYYY-MM-DD の形で指定してください（省略すると本日）。")
+    if args.unsent:
+        sets.append("sent_at = null")
     if args.disable:
         sets.append("disabled = true")
     if args.enable:
         sets.append("disabled = false")
     if not sets:
-        sys.exit("変更内容を指定してください（--expires / --max / --disable / --enable）。")
+        sys.exit("変更内容を指定してください（--expires / --max / --sent / --unsent / --disable / --enable）。")
 
     rows = run_sql(f"""
       select code, label, redeemed_count, max_redemptions,
@@ -501,6 +514,113 @@ def cmd_codes_set(argv):
         return
     run_sql(f"update public.promo_codes set {', '.join(sets)} where {where}")
     print(f"{len(rows)} 件を変更しました。")
+
+
+# ---------------------------------------------------------------
+# 連絡の支度（送付先・コード・文面を 1 回で揃える）
+# ---------------------------------------------------------------
+MAIL_DOC = os.path.join(REPO, "docs", "20261111_動画投稿者への連絡文面.md")
+
+
+def _templates(path: str = MAIL_DOC) -> dict:
+    """文面の文書から、件名と本文を取り出す。印（template:...）の次の ``` 囲みを読む"""
+    text = open(path, encoding="utf-8").read()
+    out = {}
+    for key in ("subject", "long", "short"):
+        m = re.search(r"<!--\s*template:" + key + r"\s*-->\s*```[a-z]*\n(.*?)```", text, re.S)
+        if m:
+            out[key] = m.group(1).rstrip("\n")
+    missing = [k for k in ("subject", "long") if k not in out]
+    if missing:
+        sys.exit(f"文面が見つかりません（{', '.join(missing)}）: {path}")
+    return out
+
+
+def _safe_name(s: str) -> str:
+    """ファイル名に使えない字を落とす"""
+    return re.sub(r"[^\w\u3040-\u30ff\u4e00-\u9fff ー・－-]+", "_", s).strip()[:40] or "channel"
+
+
+def cmd_outreach(argv):
+    import argparse, csv, datetime
+    ap = argparse.ArgumentParser(prog="outreach", description="送付先一覧と 1 通ずつの文面を書き出す")
+    ap.add_argument("--contributors", help="seedpipeline の contributors が出した CSV")
+    ap.add_argument("--note-like", default="シード貢献のお礼", help="対象とするコードの覚え書き")
+    ap.add_argument("--limit", type=int, help="上位何件まで出すか")
+    ap.add_argument("--out", help="書き出し先のフォルダ（既定は out/）")
+    ap.add_argument("--include-sent", action="store_true", help="送付済みの相手も文面を書き出す")
+    args = ap.parse_args(argv)
+
+    codes = run_sql(f"""
+      select code, label, channel_id, kind, free_days, credits, max_redemptions, redeemed_count,
+             to_char(expires_at, 'YYYY-MM-DD') as expires,
+             to_char(sent_at, 'YYYY-MM-DD') as sent, disabled
+        from public.promo_codes
+       where coalesce(note, '') like {_sql_str('%' + args.note_like + '%')}
+       order by created_at, code
+    """) or []
+    if not codes:
+        sys.exit(f"「{args.note_like}」に当てはまるコードがありません。先に codes-new で発行してください。")
+
+    # 貢献の一覧（あれば）を channel_id で突き合わせる
+    extra = {}
+    order = {}
+    if args.contributors:
+        with open(args.contributors, encoding="utf-8-sig") as f:
+            for i, row in enumerate(csv.DictReader(f)):
+                cid = (row.get("チャンネルID") or row.get("channel_id") or "").strip()
+                if not cid:
+                    continue
+                extra[cid] = row
+                order[cid] = int(row.get("順位") or i + 1)
+
+    rows = sorted(codes, key=lambda c: order.get(c["channel_id"] or "", 9999))
+    if args.limit:
+        rows = rows[:args.limit]
+
+    tpl = _templates()
+    out_dir = args.out or os.path.join(HERE, "out")
+    mail_dir = os.path.join(out_dir, "mails")
+    os.makedirs(mail_dir, exist_ok=True)
+
+    merged = os.path.join(out_dir, f"{datetime.date.today():%Y%m%d}_outreach.csv")
+    written = 0
+    with open(merged, "w", encoding="utf-8-sig", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["順位", "チャンネル名", "コード", "送付日", "使用回数", "道の本数", "動画の本数",
+                    "登録者数", "最新の投稿日", "チャンネルURL", "内容", "入力期限", "文面", "チャンネルID"])
+        for c in rows:
+            e = extra.get(c["channel_id"] or "", {})
+            name = c["label"] or e.get("チャンネル名", "")
+            grant = (f"{c['free_days']} 日間無料" if c["kind"] == "free_period"
+                     else f"閲覧枠 {c['credits']}")
+            rank = order.get(c["channel_id"] or "", "")
+            url = e.get("チャンネルURL") or (
+                f"https://www.youtube.com/channel/{c['channel_id']}" if c["channel_id"] else "")
+
+            mail_path = ""
+            if args.include_sent or not c["sent"]:
+                body = tpl["long"].replace("○○", name).replace("XXXXXXXX", c["code"])
+                fname = f"{str(rank).zfill(2) if rank else '00'}_{_safe_name(name)}_{c['code']}.txt"
+                mail_path = os.path.join(mail_dir, fname)
+                with open(mail_path, "w", encoding="utf-8") as mf:
+                    mf.write("件名: " + tpl["subject"].strip() + "\n")
+                    mf.write("宛先: （YouTube の概要欄 / チャンネルの概要から確認）\n")
+                    mf.write("チャンネル: " + name + "\n")
+                    mf.write("URL: " + url + "\n")
+                    mf.write("-" * 60 + "\n\n" + body + "\n")
+                written += 1
+
+            w.writerow([rank, name, c["code"], c["sent"] or "", c["redeemed_count"],
+                        e.get("道の本数", ""), e.get("動画の本数", ""), e.get("登録者数", ""),
+                        e.get("最新の投稿日", ""), url, grant, c["expires"] or "",
+                        os.path.basename(mail_path), c["channel_id"] or ""])
+
+    print(f"送付先 {len(rows)} 件 / 文面 {written} 通")
+    print(f"一覧 → {merged}")
+    print(f"文面 → {mail_dir}/")
+    print("\n送ったら、台帳に記録してください（送付済みは次回から文面を作りません）:")
+    print("  python3 20260905_db_admin.py codes-set --code ZDXXXXXX --sent")
 
 
 def main():
@@ -538,6 +658,8 @@ def run(cmd: str):
         cmd_codes_new(sys.argv[2:])
     elif cmd == "codes-set":
         cmd_codes_set(sys.argv[2:])
+    elif cmd == "outreach":
+        cmd_outreach(sys.argv[2:])
     elif cmd == "sql":
         print(json.dumps(run_sql(sys.argv[2]), ensure_ascii=False, indent=2))
     else:
