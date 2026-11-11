@@ -4,9 +4,6 @@ import CoreLocation
 
 /// プライバシーゾーン（自宅など伏せたい場所）の設定。マイページと取り込み時の案内で共用する
 struct PrivacyZoneCard: View {
-    @AppStorage(MapLook.key) private var mapLookRaw = MapLook.hybrid.rawValue
-    private var mapLook: MapLook { MapLook(rawValue: mapLookRaw) ?? .hybrid }
-
     @EnvironmentObject private var app: AppState
     @State private var isLocating = false
     @State private var showPicker = false
@@ -146,6 +143,9 @@ struct PrivacyZoneNotice: View {
 
 /// 地図を動かして、伏せたい場所の中心を決める。自宅から離れていても設定できる
 struct PrivacyZonePickerView: View {
+    @AppStorage(MapLook.key) private var mapLookRaw = MapLook.hybrid.rawValue
+    private var mapLook: MapLook { MapLook(rawValue: mapLookRaw) ?? .hybrid }
+
     @EnvironmentObject private var app: AppState
     @Environment(\.dismiss) private var dismiss
 
