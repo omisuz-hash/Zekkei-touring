@@ -385,6 +385,8 @@ def cmd_codes_new(argv):
     ap.add_argument("--prefix", default="ZD", help="コードの頭に付ける文字")
     ap.add_argument("--note", default="", help="控えとして残す覚え書き")
     ap.add_argument("--out", help="発行結果の CSV。既定は out/<日付>_promo_codes.csv")
+    ap.add_argument("--allow-duplicates", action="store_true",
+                    help="既にコードを持つ配布先にも、もう 1 つ発行する")
     args = ap.parse_args(argv)
 
     targets = []
@@ -400,6 +402,20 @@ def cmd_codes_new(argv):
     targets = [(name.strip(), cid.strip()) for name, cid in targets if name.strip()]
     if not targets:
         sys.exit("配布先が 1 件もありません。")
+
+    # 既にコードを渡した相手を二重に発行しない（一覧を広げて再実行するため）
+    if not args.allow_duplicates:
+        known = run_sql("select channel_id, label from public.promo_codes") or []
+        by_id = {r["channel_id"] for r in known if r["channel_id"]}
+        by_name = {r["label"] for r in known if r["label"]}
+        before = len(targets)
+        targets = [(n, c) for n, c in targets if (c not in by_id) and (n not in by_name)]
+        skipped = before - len(targets)
+        if skipped:
+            print(f"発行済みの配布先 {skipped} 件は飛ばします。")
+        if not targets:
+            print("新しく発行する配布先がありません。")
+            return
 
     expires = args.expires or (datetime.date.today() + datetime.timedelta(days=180)).isoformat()
     grant = f"{args.days} 日間の閲覧無制限" if args.kind == "free_period" else f"閲覧枠 {args.credits} つ"
