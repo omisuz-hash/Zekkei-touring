@@ -6,18 +6,20 @@
 #   ./20260905_setup_xcode.sh --run      Xcode の画面操作なしで、シミュレータを起動してアプリを入れて開く（署名不要）
 #   ./20260905_setup_xcode.sh --archive  配布用に書き出す（TestFlight へ送る .ipa を作る）。Team ID が必要
 #   ./20260905_setup_xcode.sh --team XXXXXXXXXX   Team ID を登録して保存する（初回のみ。以後は省略可）
+#   ./20260905_setup_xcode.sh --run --sim "iPhone 17 Pro Max"   端末を指定して起動する（App Store 用の画面写真を撮るとき）
 # 前提: Xcode（App Store）、Homebrew。xcodegen は無ければこのスクリプトが入れる。
 # 接続先は ~/.zekkei_supabase から読み、Local.xcconfig（git 管理外）に書き出す。
 set -uo pipefail
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 cd "$(dirname "$0")"
-OPEN=1; APPLE=1; RUN=0; ARCHIVE=0
+OPEN=1; APPLE=1; RUN=0; ARCHIVE=0; SIMNAME=""
 TEAMFILE="$HOME/.zekkei_ios"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --no-open) OPEN=0 ;;
     --no-apple-signin) APPLE=0 ;;
     --run) RUN=1; OPEN=0 ;;
+    --sim) SIMNAME="${2:-}"; shift ;;
     --archive) ARCHIVE=1; OPEN=0 ;;
     --team) shift; printf 'ZEKKEI_TEAM_ID=%s\n' "${1:-}" > "$TEAMFILE"; chmod 600 "$TEAMFILE"; echo "Team ID を保存しました: $TEAMFILE" ;;
   esac
@@ -168,7 +170,18 @@ if [[ $RUN -eq 1 ]]; then
   # 別の端末に変えたい場合は  rm ~/.zekkei_sim  してから実行する。
   SIMFILE="$HOME/.zekkei_sim"
   DEVICE=""
-  if [[ -f "$SIMFILE" ]]; then
+  # --sim で端末を名前で選ぶ（画面写真の大きさを App Store の規定に合わせたいとき）
+  if [[ -n "$SIMNAME" ]]; then
+    DEVICE="$(xcrun simctl list devices available | grep -F "$SIMNAME (" | head -1 | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')"
+    if [[ -z "$DEVICE" ]]; then
+      echo "「$SIMNAME」のシミュレータがありません。使えるものは次の通りです:"
+      xcrun simctl list devices available | grep -E '^\s+iPhone' | sed -E 's/^\s+/  /; s/ \(.*//' | sort -u
+      echo "無い場合は Xcode → Settings → Components から追加してください。"
+      exit 1
+    fi
+    printf '%s' "$DEVICE" > "$SIMFILE"
+  fi
+  if [[ -z "$DEVICE" && -f "$SIMFILE" ]]; then
     CAND="$(cat "$SIMFILE")"
     xcrun simctl list devices available | grep -q "$CAND" && DEVICE="$CAND"
   fi
