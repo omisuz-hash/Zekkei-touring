@@ -501,7 +501,9 @@ class Store:
         s["spots_wikipedia"] = self.db.execute("select count(*) from spots where source='wikipedia'").fetchone()[0]
         s["roads_with_spots"] = self.db.execute("select count(distinct road_id) from spots").fetchone()[0]
         s["videos_respot_pending"] = self.db.execute(
-            "select count(*) from videos where status in ('extracted','video_analyzed') and coalesce(spots_done,0)=0").fetchone()[0]
+            # 取り直しの対象（videos_for_respot）と同じ条件で数える。形の引けた道が 1 本も無い動画は対象外
+            """select count(*) from videos v where v.status in ('extracted','video_analyzed') and coalesce(v.spots_done,0)=0
+               and exists (select 1 from road_videos rv join roads r on r.id=rv.road_id where rv.video_id=v.id and r.geo_status='ok')""").fetchone()[0]
         s["roads_wiki_pending"] = self.db.execute("select count(*) from roads where geo_status='ok' and coalesce(wiki_status,'pending')='pending'").fetchone()[0]
         s["spots_with_photo"] = self.db.execute("select count(*) from spots where photo_url is not null").fetchone()[0]
         # 動画サムネイルの代用（現地写真ではない）を除いた、本当に現地の写真が見つかった件数
