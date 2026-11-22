@@ -195,7 +195,9 @@ if [[ $RUN -eq 1 ]]; then
   NAME="$(xcrun simctl list devices available | grep "$DEVICE" | sed -E 's/^\s+//; s/ \(.*//')"
   echo "端末: $NAME"
   xcrun simctl boot "$DEVICE" 2>/dev/null || true
-  open -a Simulator
+  # Xcode 27 では名前だけでは見つからないことがあるため、Xcode の中の実体を指す
+  SIMAPP="$(xcode-select -p)/Applications/Simulator.app"
+  if [[ -d "$SIMAPP" ]]; then open -a "$SIMAPP"; else open -a Simulator 2>/dev/null || true; fi
   xcodebuild -project ZekkeiTouring.xcodeproj -scheme ZekkeiTouring -destination "id=$DEVICE" -configuration Debug \
     -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build 2>&1 | tee build/last_run_build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" | sort -u
   APP="$(find build/DerivedData -name 'ZekkeiTouring.app' -path '*iphonesimulator*' | head -1)"
