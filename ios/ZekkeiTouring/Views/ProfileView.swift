@@ -136,15 +136,6 @@ struct ProfileView: View {
                         }
                         .padding(16)
                         Divider().overlay(ZK.divider)
-                        // 月額プランはベータ公開の後。押せそうに見せない
-                        HStack {
-                            Text("月額プラン").font(.system(size: 15, weight: .bold)).foregroundStyle(ZK.disabled)
-                            Text("無制限 · 380 円/月（予定）").font(.system(size: 12)).foregroundStyle(ZK.caption)
-                            Spacer()
-                            Text("準備中").font(.system(size: 11, weight: .semibold)).foregroundStyle(ZK.caption)
-                        }
-                        .padding(16)
-                        Divider().overlay(ZK.divider)
                         Button { if app.isSignedIn { showRedeem = true } else { showSignIn = true } } label: {
                             HStack {
                                 Text("招待コードを使う").font(.system(size: 15)).foregroundStyle(.white)
@@ -236,7 +227,7 @@ extension ProfileView {
     /// アカウント欄の肩書き
     var planCaption: String {
         guard app.isSignedIn else { return "Apple または Google で" }
-        if app.profile?.plan == .subscriber { return "月額プラン" }
+        if app.profile?.plan == .subscriber { return "閲覧無制限" }
         if let until = app.profile?.subscriberUntil, until > Date() {
             let f = DateFormatter()
             f.locale = Locale(identifier: "ja_JP")
@@ -248,7 +239,7 @@ extension ProfileView {
 
     /// 閲覧枠の説明
     var creditNote: String {
-        if app.profile?.plan == .subscriber { return "月額プランのため、枠を使わずに全ての詳細を見られます。" }
+        if app.profile?.plan == .subscriber { return "枠を使わずに全ての詳細を見られます。" }
         if let until = app.profile?.subscriberUntil, until > Date() {
             let f = DateFormatter()
             f.locale = Locale(identifier: "ja_JP")

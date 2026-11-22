@@ -371,9 +371,9 @@ struct RoadDetailView: View {
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(app.creditBalance <= 0)
-                Text("評価の内訳・立ち寄りスポットの場所・Google マップへのナビが見られます。\n絶景道を投稿すると閲覧枠が増えます。月額プランなら無制限です。")
+                Text("評価の内訳・立ち寄りスポットの場所・Google マップへのナビが見られます。\n絶景道を投稿すると閲覧枠が増えます。")
                     .font(.system(size: 11)).foregroundStyle(ZK.caption).multilineTextAlignment(.center)
-                Text("月額プランはベータ公開の後に提供予定").font(.system(size: 11)).foregroundStyle(ZK.disabled)
+                Text("閲覧枠は毎月 10 つ補充されます").font(.system(size: 11)).foregroundStyle(ZK.disabled)
             } else {
                 Button("ログインして見る") { showSignIn = true }.buttonStyle(PrimaryButtonStyle())
             }
