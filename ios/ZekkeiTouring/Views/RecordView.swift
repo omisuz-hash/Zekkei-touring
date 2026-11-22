@@ -7,6 +7,8 @@ struct RecordView: View {
     private var mapLook: MapLook { MapLook(rawValue: mapLookRaw) ?? .hybrid }
     /// 走行中は進行方向を上にした方が、今どちらへ向かっているかが分かりやすい
     @AppStorage("map.headingUp") private var headingUp = false
+    /// 現在地を取りに行っている最中か（二重に走らせない）
+    @State private var locating = false
 
     @EnvironmentObject private var app: AppState
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
@@ -31,7 +33,7 @@ struct RecordView: View {
                 .ignoresSafeArea()
 
                 // GPS 状態ピル
-                Text(recorder.lastLocation == nil ? "GPS を待機中" : "GPS 良好 · 現在地を追従中")
+                Text(gpsText)
                     .font(.system(size: 12, weight: .medium)).foregroundStyle(.white)
                     .padding(.horizontal, 14).frame(height: 36).glassPill(radius: 999)
                     .padding(.top, 8)
@@ -57,8 +59,29 @@ struct RecordView: View {
             .navigationDestination(item: $finishedRide) { ride in TrimView(ride: ride) }
             .onReceive(timer) { tick = $0 }
             .onAppear { applyCamera() }
+            // 記録を始める前でも現在地を 1 度取りに行く。
+            // 取らないと「GPS を待機中」の表示のまま変わらない
+            .task {
+                guard recorder.lastLocation == nil, !locating else { return }
+                locating = true
+                _ = await recorder.currentLocation()
+                locating = false
+            }
         }
         .preferredColorScheme(.dark)
+    }
+
+    /// GPS の状態。記録していないときも、現在地が取れていれば良好と示す
+    private var gpsText: String {
+        if recorder.authorization == .denied || recorder.authorization == .restricted {
+            return "位置情報が許可されていません"
+        }
+        guard recorder.lastLocation != nil else { return "GPS を待機中" }
+        switch recorder.state {
+        case .recording: return "GPS 良好 · 記録中"
+        case .paused:    return "停車中 · 自動で一時停止しています"
+        case .idle:      return "GPS 良好 · 現在地を表示中"
+        }
     }
 
     /// 地図の上に置く小さな切り替えボタン
