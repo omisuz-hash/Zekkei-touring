@@ -176,6 +176,12 @@ struct ProfileView: View {
                             .font(.system(size: 13)).foregroundStyle(ZK.caption).frame(maxWidth: .infinity).padding(.top, 4)
                             .disabled(isDeleting)
                     }
+
+                    // 問い合わせのとき「どの版をお使いですか」を尋ねられるようにする
+                    Text(AppVersion.display)
+                        .font(.system(size: 11)).foregroundStyle(ZK.disabled)
+                        .frame(maxWidth: .infinity).padding(.top, 18)
+                        .textSelection(.enabled)
                 }
                 .padding(.horizontal, 16).padding(.bottom, 24)
             }

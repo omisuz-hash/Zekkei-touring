@@ -183,6 +183,11 @@ struct RidesListView: View {
     @State private var showPrivacy = false
     /// 取り込み後に、未設定なら続けて設定を促す
     @State private var suggestPrivacyAfterImport = false
+    /// まとめて書き出したファイル。共有の画面に渡す
+    @State private var exportURLs: [URL] = []
+    @State private var showExportShare = false
+    @State private var isExporting = false
+    @State private var exportError: String?
 
     var body: some View {
         NavigationStack {
@@ -219,6 +224,42 @@ struct RidesListView: View {
                         .padding(14).innerGroup(radius: 14)
                     }
                     .listRowBackground(Color.clear).listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+
+                    if !app.store.rides.isEmpty {
+                        Button { exportAll() } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "square.and.arrow.up.on.square")
+                                    .font(.system(size: 15)).foregroundStyle(ZK.accent)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(isExporting ? "書き出し中…" : "すべてまとめて書き出す")
+                                        .font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+                                    Text("\(app.store.rides.count) 件を GPX で保存します。ファイルアプリや iCloud Drive に置いておくと、入れ直したときに戻せます")
+                                        .font(.system(size: 11)).foregroundStyle(ZK.caption)
+                                }
+                                Spacer()
+                                if isExporting {
+                                    ProgressView().tint(ZK.accent)
+                                } else {
+                                    Image(systemName: "chevron.right").foregroundStyle(ZK.caption)
+                                }
+                            }
+                            .padding(14).innerGroup(radius: 14)
+                        }
+                        .disabled(isExporting)
+                        .listRowBackground(Color.clear).listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                    }
+
+                    // 端末にしか無いことは、失ってから気づくと取り返しがつかない
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 12)).foregroundStyle(ZK.paused)
+                        Text("走行記録はこの端末にのみ保存されます。アプリを削除すると消えます。残しておきたい記録は、書き出して保存してください。")
+                            .font(.system(size: 11)).lineSpacing(4).foregroundStyle(ZK.caption)
+                    }
+                    .padding(.horizontal, 4)
+                    .listRowBackground(Color.clear).listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 8, trailing: 12))
                 }
                 if app.store.rides.isEmpty {
@@ -243,6 +284,10 @@ struct RidesListView: View {
             .background(ZK.bg)
             .navigationBarHidden(true)
             .navigationDestination(for: RideLog.self) { ride in TrimView(ride: ride) }
+            .sheet(isPresented: $showExportShare) { ShareSheet(items: exportURLs) }
+            .alert("書き出せませんでした", isPresented: Binding(get: { exportError != nil }, set: { if !$0 { exportError = nil } })) {
+                Button("閉じる", role: .cancel) { exportError = nil }
+            } message: { Text(exportError ?? "") }
             .fileImporter(isPresented: $showImporter,
                           allowedContentTypes: TrackFileTypes.all,
                           allowsMultipleSelection: true) { result in
@@ -262,6 +307,30 @@ struct RidesListView: View {
     }
 
     /// 選ばれたファイルを読み込み、走行記録として保存する
+    /// 走行記録を全部 GPX にして、共有の画面に渡す。
+    /// 端末内にしか無い記録を、利用者が自分で残せるようにするためのもの
+    private func exportAll() {
+        guard !isExporting else { return }
+        isExporting = true
+        let rides = app.store.rides
+        Task {
+            var urls: [URL] = []
+            var failed = 0
+            for ride in rides {
+                if let url = try? TrackExporter.write(ride) { urls.append(url) } else { failed += 1 }
+            }
+            isExporting = false
+            guard !urls.isEmpty else {
+                exportError = "走行記録を書き出せませんでした。端末の空き容量をご確認ください。"
+                return
+            }
+            // 一部だけ失敗した場合は、書き出せた分をそのまま共有する。
+            // ここで注意書きを出すと、共有の画面と重なって操作できなくなる
+            exportURLs = urls
+            showExportShare = true
+        }
+    }
+
     private func importFiles(_ result: Result<[URL], Error>) {
         switch result {
         case .failure(let e):
