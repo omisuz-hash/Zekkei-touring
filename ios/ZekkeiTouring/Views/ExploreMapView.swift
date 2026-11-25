@@ -28,8 +28,6 @@ struct ExploreMapView: View {
     @State private var spanLat: Double = 1.5
     @State private var didSetInitialRegion = false
     @FocusState private var searchFocused: Bool
-    /// コンパスを既定位置ではなく自前の並びに置くために使う
-    @Namespace private var mapScope
 
     /// 全部の道にタグを出す。目立つ道ほど後に描いて、重なったときに上に来るようにする
     private var taggedRoads: [ZekkeiRoad] {
@@ -38,7 +36,7 @@ struct ExploreMapView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            Map(position: $position, selection: $mapSelection, scope: mapScope) {
+            Map(position: $position, selection: $mapSelection) {
                 UserAnnotation()
                 ForEach(taggedRoads) { road in
                     let color = ZK.color(for: road, scale: mapScale)
@@ -104,7 +102,7 @@ struct ExploreMapView: View {
                         legend
                     }
                     Spacer()
-                    // 地図の操作は右側に縦一列でまとめる（上から 拡大縮小 → 方位 → 地図の種類 → 現在地）
+                    // 地図の操作は右側に縦一列でまとめる（上から 拡大縮小 → 地図の種類 → 現在地）
                     VStack(spacing: 8) {
                         VStack(spacing: 0) {
                             Button { zoom(by: 0.5) } label: {
@@ -116,9 +114,6 @@ struct ExploreMapView: View {
                             }
                         }
                         .glassPill(radius: 14)
-                        MapCompass(scope: mapScope)
-                            .mapControlVisibility(.visible)
-                            .frame(width: 44, height: 44)
                         // 航空写真と道路地図の切り替え。道の形や地名を読みたい場面がある
                         Button { mapLookRaw = mapLook.next.rawValue } label: {
                             Image(systemName: mapLook.next.symbol)
@@ -141,8 +136,6 @@ struct ExploreMapView: View {
                 ProgressView().tint(.white).padding(8).glassPill(radius: 999).padding(.top, 60)
             }
         }
-        // コンパスを自前の並びに置くため、地図と操作を同じ scope にそろえる
-        .mapScope(mapScope)
         .onChange(of: mapSelection) { _, new in
             if let r = new, selected == nil { selected = r }
         }
@@ -227,20 +220,8 @@ struct ExploreMapView: View {
 
     private var legend: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // 見出しそのものが切り替えになっている。右の文字で、押せることと切り替え先を示す
-            Button { mapScaleRaw = mapScale.next.rawValue } label: {
-                HStack(spacing: 8) {
-                    Text(mapScale.title).font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
-                    Spacer(minLength: 4)
-                    HStack(spacing: 3) {
-                        Text("\(mapScale.next.title)に切り替える").font(.system(size: 10, weight: .semibold))
-                        Image(systemName: "chevron.right").font(.system(size: 8, weight: .bold))
-                    }
-                    .foregroundStyle(mapScale.next == .popularity ? ZK.pop1 : ZK.accent)
-                }
-            }
-            .accessibilityLabel("\(mapScale.next.title)で色を付ける")
-            .padding(.bottom, 2)
+            Text(mapScale.title).font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
+                .padding(.bottom, 2)
             if mapScale == .scenery {
                 legendRow(ZK.tier1, "4.5 以上")
                 legendRow(ZK.tier2, "3.5 以上")
@@ -253,7 +234,18 @@ struct ExploreMapView: View {
             // 重ね描き（もう一方の尺度でも上位の道）
             legendRow(mapScale == .scenery ? ZK.pop1 : ZK.tier1,
                       mapScale == .scenery ? "定番でもある" : "絶景度も高い", height: 2)
+            // 尺度の切り替えは凡例のいちばん下。横に広げず、必要な幅だけに収める
+            Divider().overlay(ZK.border).padding(.top, 2)
+            Button { mapScaleRaw = mapScale.next.rawValue } label: {
+                HStack(spacing: 4) {
+                    Text("\(mapScale.next.title)に切り替える").font(.system(size: 11, weight: .semibold))
+                    Image(systemName: "chevron.right").font(.system(size: 8, weight: .bold))
+                }
+                .foregroundStyle(mapScale.next == .popularity ? ZK.pop1 : ZK.accent)
+            }
+            .accessibilityLabel("\(mapScale.next.title)で色を付ける")
         }
+        .fixedSize(horizontal: true, vertical: false)
         .padding(12).glassPill(radius: 14)
     }
 
