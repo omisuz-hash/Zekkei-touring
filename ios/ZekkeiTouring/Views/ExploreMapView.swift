@@ -28,6 +28,8 @@ struct ExploreMapView: View {
     @State private var spanLat: Double = 1.5
     @State private var didSetInitialRegion = false
     @FocusState private var searchFocused: Bool
+    /// コンパスを既定位置ではなく自前の並びに置くために使う
+    @Namespace private var mapScope
 
     /// 全部の道にタグを出す。目立つ道ほど後に描いて、重なったときに上に来るようにする
     private var taggedRoads: [ZekkeiRoad] {
@@ -36,7 +38,7 @@ struct ExploreMapView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            Map(position: $position, selection: $mapSelection) {
+            Map(position: $position, selection: $mapSelection, scope: mapScope) {
                 UserAnnotation()
                 ForEach(taggedRoads) { road in
                     let color = ZK.color(for: road, scale: mapScale)
@@ -46,9 +48,11 @@ struct ExploreMapView: View {
                         MapPolyline(coordinates: road.coordinates).stroke(color.opacity(0.35), lineWidth: level >= 2 ? 16 : 12)
                     }
                     MapPolyline(coordinates: road.coordinates).stroke(color, lineWidth: lineWidth(road))
-                    // 中央の白線は「もう一方の尺度も最上段」の印。絶景度と定番度が重なる道が分かる
+                    // もう一方の尺度でも最上段の道は、その尺度の色を細く重ねる。
+                    // 定番度（オレンジ）の上にブルーが乗っていれば「絶景度も高い」と読める
                     if road.level(for: mapScale.next) >= 2 {
-                        MapPolyline(coordinates: road.coordinates).stroke(Color.white.opacity(0.7), lineWidth: 1.2)
+                        MapPolyline(coordinates: road.coordinates)
+                            .stroke(ZK.color(for: road, scale: mapScale.next), lineWidth: 2)
                     }
                 }
                 ForEach(taggedRoads) { road in
@@ -66,7 +70,6 @@ struct ExploreMapView: View {
                 }
             }
             .zkMapStyle(mapLook)
-            .mapControls { MapCompass() }
             .onMapCameraChange(frequency: .onEnd) { ctx in
                 spanLat = ctx.region.span.latitudeDelta
                 currentRegion = ctx.region
@@ -92,7 +95,7 @@ struct ExploreMapView: View {
             }
             .padding(.horizontal, 12).padding(.top, 8)
 
-            // 左下: 凡例 / 右下: 拡大・縮小・現在地
+            // 左下: 地域と凡例（凡例の見出しが尺度の切り替え） / 右下: 地図の操作を縦一列
             VStack {
                 Spacer()
                 HStack(alignment: .bottom) {
@@ -101,40 +104,35 @@ struct ExploreMapView: View {
                         legend
                     }
                     Spacer()
-                    VStack(spacing: 0) {
-                        Button { zoom(by: 0.5) } label: {
-                            Image(systemName: "plus").font(.system(size: 16, weight: .semibold)).foregroundStyle(.white).frame(width: 44, height: 40)
+                    // 地図の操作は右側に縦一列でまとめる（上から 拡大縮小 → 方位 → 地図の種類 → 現在地）
+                    VStack(spacing: 8) {
+                        VStack(spacing: 0) {
+                            Button { zoom(by: 0.5) } label: {
+                                Image(systemName: "plus").font(.system(size: 16, weight: .semibold)).foregroundStyle(.white).frame(width: 44, height: 40)
+                            }
+                            Rectangle().fill(ZK.border).frame(width: 24, height: 1)
+                            Button { zoom(by: 2) } label: {
+                                Image(systemName: "minus").font(.system(size: 16, weight: .semibold)).foregroundStyle(.white).frame(width: 44, height: 40)
+                            }
                         }
-                        Rectangle().fill(ZK.border).frame(width: 24, height: 1)
-                        Button { zoom(by: 2) } label: {
-                            Image(systemName: "minus").font(.system(size: 16, weight: .semibold)).foregroundStyle(.white).frame(width: 44, height: 40)
+                        .glassPill(radius: 14)
+                        MapCompass(scope: mapScope)
+                            .mapControlVisibility(.visible)
+                            .frame(width: 44, height: 44)
+                        // 航空写真と道路地図の切り替え。道の形や地名を読みたい場面がある
+                        Button { mapLookRaw = mapLook.next.rawValue } label: {
+                            Image(systemName: mapLook.next.symbol)
+                                .font(.system(size: 17, weight: .semibold)).foregroundStyle(.white)
+                                .frame(width: 44, height: 44).glassPill(radius: 14)
                         }
-                    }
-                    .glassPill(radius: 14)
-                    .padding(.trailing, 8)
-                    // 色を付ける尺度の切り替え。「絶景の道」と「定番の道」は必ずしも一致しない
-                    Button { mapScaleRaw = mapScale.next.rawValue } label: {
-                        Image(systemName: mapScale.next.symbol)
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(mapScale.next == .popularity ? ZK.pop1 : ZK.accent)
-                            .frame(width: 44, height: 44).glassPill(radius: 14)
-                    }
-                    .accessibilityLabel("\(mapScale.next.title)で色を付ける")
-                    .padding(.trailing, 8)
-                    // 航空写真と道路地図の切り替え。道の形や地名を読みたい場面がある
-                    Button { mapLookRaw = mapLook.next.rawValue } label: {
-                        Image(systemName: mapLook.next.symbol)
-                            .font(.system(size: 17, weight: .semibold)).foregroundStyle(.white)
-                            .frame(width: 44, height: 44).glassPill(radius: 14)
-                    }
-                    .accessibilityLabel("\(mapLook.next.title)に切り替える")
-                    .padding(.trailing, 8)
-                    Button {
-                        app.recorder.requestPermission()
-                        withAnimation { position = .userLocation(fallback: .automatic) }
-                    } label: {
-                        Image(systemName: "location").font(.system(size: 18, weight: .semibold)).foregroundStyle(.white)
-                            .frame(width: 44, height: 44).glassPill(radius: 14)
+                        .accessibilityLabel("\(mapLook.next.title)に切り替える")
+                        Button {
+                            app.recorder.requestPermission()
+                            withAnimation { position = .userLocation(fallback: .automatic) }
+                        } label: {
+                            Image(systemName: "location").font(.system(size: 18, weight: .semibold)).foregroundStyle(.white)
+                                .frame(width: 44, height: 44).glassPill(radius: 14)
+                        }
                     }
                 }
                 .padding(.horizontal, 12).padding(.bottom, 12)
@@ -143,6 +141,8 @@ struct ExploreMapView: View {
                 ProgressView().tint(.white).padding(8).glassPill(radius: 999).padding(.top, 60)
             }
         }
+        // コンパスを自前の並びに置くため、地図と操作を同じ scope にそろえる
+        .mapScope(mapScope)
         .onChange(of: mapSelection) { _, new in
             if let r = new, selected == nil { selected = r }
         }
@@ -227,7 +227,20 @@ struct ExploreMapView: View {
 
     private var legend: some View {
         VStack(alignment: .leading, spacing: 6) {
-            CaptionLabel(text: mapScale.title, size: 8)
+            // 見出しそのものが切り替えになっている。右の文字で、押せることと切り替え先を示す
+            Button { mapScaleRaw = mapScale.next.rawValue } label: {
+                HStack(spacing: 8) {
+                    Text(mapScale.title).font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
+                    Spacer(minLength: 4)
+                    HStack(spacing: 3) {
+                        Text("\(mapScale.next.title)に切り替える").font(.system(size: 10, weight: .semibold))
+                        Image(systemName: "chevron.right").font(.system(size: 8, weight: .bold))
+                    }
+                    .foregroundStyle(mapScale.next == .popularity ? ZK.pop1 : ZK.accent)
+                }
+            }
+            .accessibilityLabel("\(mapScale.next.title)で色を付ける")
+            .padding(.bottom, 2)
             if mapScale == .scenery {
                 legendRow(ZK.tier1, "4.5 以上")
                 legendRow(ZK.tier2, "3.5 以上")
@@ -237,17 +250,16 @@ struct ExploreMapView: View {
                 legendRow(ZK.pop2, "紹介 3 件以上")
                 legendRow(ZK.tier3, "紹介が少ない")
             }
-            HStack(spacing: 8) {
-                Capsule().fill(Color.white.opacity(0.75)).frame(width: 18, height: 2)
-                Text(mapScale == .scenery ? "定番でもある" : "絶景度も高い").font(.system(size: 11)).foregroundStyle(ZK.body)
-            }
+            // 重ね描き（もう一方の尺度でも上位の道）
+            legendRow(mapScale == .scenery ? ZK.pop1 : ZK.tier1,
+                      mapScale == .scenery ? "定番でもある" : "絶景度も高い", height: 2)
         }
         .padding(12).glassPill(radius: 14)
     }
 
-    private func legendRow(_ c: Color, _ t: String) -> some View {
+    private func legendRow(_ c: Color, _ t: String, height: CGFloat = 3) -> some View {
         HStack(spacing: 8) {
-            Capsule().fill(c).frame(width: 18, height: 3)
+            Capsule().fill(c).frame(width: 18, height: height)
             Text(t).font(.system(size: 11)).foregroundStyle(ZK.body)
         }
     }
