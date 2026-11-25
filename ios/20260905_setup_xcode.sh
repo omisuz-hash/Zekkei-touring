@@ -10,6 +10,26 @@
 # 前提: Xcode（App Store）、Homebrew。xcodegen は無ければこのスクリプトが入れる。
 # 接続先は ~/.zekkei_supabase から読み、Local.xcconfig（git 管理外）に書き出す。
 set -uo pipefail
+
+# シミュレータの画面を開く。
+# Xcode 27 で Simulator.app は廃止され、DeviceHub.app が置き換わった。
+# 古い Xcode も残っている環境があるため、新しい順に試す。
+open_sim_window() {
+  local hub="$(xcode-select -p)/../Applications/DeviceHub.app"
+  if [[ -d "$hub" ]] && open -a "$hub" 2>/dev/null; then return 0; fi
+  open -b com.apple.DeviceHub 2>/dev/null && return 0
+  open -b com.apple.iphonesimulator 2>/dev/null && return 0
+  open -a Simulator 2>/dev/null && return 0
+  local simapp="$(xcode-select -p)/Applications/Simulator.app"
+  [[ -d "$simapp" ]] && open -a "$simapp" 2>/dev/null && return 0
+  cat <<'EOS'
+シミュレータの画面を開けませんでした。アプリ自体はシミュレータ内で動いています。
+  画面を画像で取り出す: xcrun simctl io booted screenshot ~/Desktop/sim.png
+  Xcode から開く:       Xcode → Window → Devices and Simulators
+EOS
+  return 0
+}
+
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 cd "$(dirname "$0")"
 OPEN=1; APPLE=1; RUN=0; ARCHIVE=0; SIMNAME=""
@@ -195,13 +215,7 @@ if [[ $RUN -eq 1 ]]; then
   NAME="$(xcrun simctl list devices available | grep "$DEVICE" | sed -E 's/^\s+//; s/ \(.*//')"
   echo "端末: $NAME"
   xcrun simctl boot "$DEVICE" 2>/dev/null || true
-  # Simulator.app の置き場所は Xcode の版で変わるため、識別子で開く。
-  # それも通らなければ、名前と Xcode の中の実体を順に試す
-  SIMAPP="$(xcode-select -p)/Applications/Simulator.app"
-  open -b com.apple.iphonesimulator 2>/dev/null \
-    || open -a Simulator 2>/dev/null \
-    || { [[ -d "$SIMAPP" ]] && open -a "$SIMAPP"; } \
-    || echo "Simulator の画面を開けませんでした。 mdfind -name Simulator.app で場所を確認してください。"
+  open_sim_window
   xcodebuild -project ZekkeiTouring.xcodeproj -scheme ZekkeiTouring -destination "id=$DEVICE" -configuration Debug \
     -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build 2>&1 | tee build/last_run_build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" | sort -u
   APP="$(find build/DerivedData -name 'ZekkeiTouring.app' -path '*iphonesimulator*' | head -1)"
@@ -216,7 +230,10 @@ if [[ $RUN -eq 1 ]]; then
 # 絶景道をシミュレータで開く（ビルドはしない）。最新版にするときは 20260905_setup_xcode.sh --run
 D="\$(cat "$SIMFILE")"
 xcrun simctl boot "\$D" 2>/dev/null || true
-open -a Simulator
+# Xcode 27 以降は Simulator.app が廃止され、DeviceHub.app が画面を受け持つ
+open -a "\$(xcode-select -p)/../Applications/DeviceHub.app" 2>/dev/null \
+  || open -b com.apple.iphonesimulator 2>/dev/null \
+  || open -a Simulator 2>/dev/null || true
 sleep 2
 xcrun simctl launch "\$D" com.zekkeido.app >/dev/null && echo "起動しました"
 EOS
