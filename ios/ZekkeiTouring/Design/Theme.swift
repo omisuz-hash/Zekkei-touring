@@ -36,6 +36,9 @@ enum ZK {
     static let tier2 = Color(hex: 0x8ED4F5)       // 3.5 以上（薄いブルー）
     static let highlight = Color(hex: 0x8ED4F5)   // 強調（数字・ピン・記録中の軌跡）
     static let tier3 = Color(hex: 0x7C8B95)       // 評価が少ない
+    // 定番度 3 段階（絶景度のブルーと取り違えないよう、暖色で分ける）
+    static let pop1 = Color(hex: 0xEE7C1E)        // 10 件以上（濃いアンバー）
+    static let pop2 = Color(hex: 0xFFC9A0)        // 3 件以上（薄いアンバー）
     // 文字
     static let text = Color.white
     static let body = Color(hex: 0xC5CED3)
@@ -54,8 +57,16 @@ enum ZK {
         if s >= 3.5 { return tier2 }
         return tier3
     }
-    /// 道の表示色
+    /// 定番度から線の色
+    static func tier(popularity level: Int) -> Color {
+        level >= 2 ? pop1 : (level == 1 ? pop2 : tier3)
+    }
+    /// 道の表示色。既定は絶景度
     static func color(for road: ZekkeiRoad) -> Color { tier(scenery: road.displayScenery) }
+    /// 道の表示色（尺度を指定する）
+    static func color(for road: ZekkeiRoad, scale: MapScale) -> Color {
+        scale == .scenery ? tier(scenery: road.displayScenery) : tier(popularity: road.popularityLevel)
+    }
 }
 
 // MARK: - 文字
@@ -157,10 +168,13 @@ struct CodeTag: View {
     var level: Int = 1
     /// 強調段階（絶景度 4.5 以上）のときだけ、アイコンの位置に出す代表画像
     var thumbnail: URL? = nil
+    /// 枠と文字の色。尺度を切り替えたときに線の色と揃える
+    var strongColor: Color = ZK.highlight
+    var normalColor: Color = ZK.accent
     var body: some View {
         let size: CGFloat = level >= 2 ? 13 : (level == 1 ? 10.5 : 9)
         let weight: Font.Weight = level >= 2 ? .heavy : (level == 1 ? .bold : .medium)
-        let border = muted ? ZK.tier3 : (level >= 2 ? ZK.highlight : ZK.accent)
+        let border = muted ? ZK.tier3 : (level >= 2 ? strongColor : normalColor)
         HStack(spacing: 5) {
             if level >= 2, let url = thumbnail {
                 AsyncImage(url: url) { phase in
@@ -179,12 +193,12 @@ struct CodeTag: View {
             }
             Text(code).font(.system(size: size, weight: weight)).tracking(0.4)
         }
-        .foregroundStyle(muted ? ZK.caption : (level >= 2 ? ZK.highlight : .white))
+        .foregroundStyle(muted ? ZK.caption : (level >= 2 ? strongColor : .white))
         .padding(.horizontal, level >= 2 ? 10 : 8).padding(.vertical, level >= 2 ? 6 : 5)
         .background(muted ? Color(hex: 0x1A2126).opacity(0.85) : ZK.tagBg.opacity(level == 0 ? 0.8 : 1))
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(border, lineWidth: level >= 2 ? 1.6 : 1.2))
-        .shadow(color: level >= 2 ? ZK.highlight.opacity(0.45) : .clear, radius: 6)
+        .shadow(color: level >= 2 ? strongColor.opacity(0.45) : .clear, radius: 6)
     }
 }
 

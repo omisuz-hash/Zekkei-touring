@@ -23,7 +23,7 @@ protocol Backend: AnyObject {
     /// 招待コードを使う
     func redeemCode(_ code: String) async throws -> RedeemResult
 
-    func nearbyRoads(center: CLLocationCoordinate2D, radiusMeters: Double, limit: Int) async throws -> [ZekkeiRoad]
+    func nearbyRoads(center: CLLocationCoordinate2D, radiusMeters: Double, limit: Int, order: MapScale) async throws -> [ZekkeiRoad]
     func road(id: UUID) async throws -> ZekkeiRoad?
     func findOverlappingRoad(ewkt: String, minRatio: Double) async throws -> OverlapMatch?
     func createRoad(_ draft: RoadDraft) async throws -> ZekkeiRoad
@@ -121,7 +121,7 @@ final class MockBackend: Backend {
     }
     func updatePrivacyZone(center: CLLocationCoordinate2D?, radiusMeters: Int) async throws {}
 
-    func nearbyRoads(center: CLLocationCoordinate2D, radiusMeters: Double, limit: Int) async throws -> [ZekkeiRoad] { Array(roads.prefix(limit)) }
+    func nearbyRoads(center: CLLocationCoordinate2D, radiusMeters: Double, limit: Int, order: MapScale) async throws -> [ZekkeiRoad] { Array(roads.prefix(limit)) }
     func road(id: UUID) async throws -> ZekkeiRoad? { roads.first { $0.id == id } }
     func findOverlappingRoad(ewkt: String, minRatio: Double) async throws -> OverlapMatch? { nil }
 

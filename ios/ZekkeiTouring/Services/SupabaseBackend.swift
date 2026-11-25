@@ -91,13 +91,20 @@ final class SupabaseBackend: Backend {
 
     // MARK: 絶景道
 
-    func nearbyRoads(center: CLLocationCoordinate2D, radiusMeters: Double, limit: Int) async throws -> [ZekkeiRoad] {
-        try await client.rpc("nearby_roads", params: [
-            "p_lat": center.latitude,
-            "p_lng": center.longitude,
-            "p_radius_m": radiusMeters,
-            "p_limit": Double(limit),
-        ]).execute().value
+    private struct NearbyParams: Encodable {
+        let p_lat: Double
+        let p_lng: Double
+        let p_radius_m: Double
+        let p_limit: Int
+        /// scenery / popularity。件数上限をかけるときに、どちらの尺度で拾うか
+        let p_order: String
+    }
+
+    func nearbyRoads(center: CLLocationCoordinate2D, radiusMeters: Double, limit: Int, order: MapScale) async throws -> [ZekkeiRoad] {
+        try await client.rpc("nearby_roads", params: NearbyParams(
+            p_lat: center.latitude, p_lng: center.longitude,
+            p_radius_m: radiusMeters, p_limit: limit, p_order: order.rawValue
+        )).execute().value
     }
 
     func spots(for roadId: UUID) async throws -> [RoadSpot] {

@@ -130,6 +130,26 @@ struct ZekkeiRoad: Codable, Identifiable, Hashable {
         return s * 0.7 + m * 0.3
     }
 
+    /// 定番度のもとになる件数。動画での言及数と、ライダーの投稿数の合計
+    var sourceCount: Int { (mentionCount ?? 0) + ratingCount }
+
+    /// 定番度 3 段階: 10 件以上 = 2、3 件以上 = 1、それ未満 = 0
+    /// しきい値はシードの分布から決めた（10 以上が全体の約 8%、3 以上が約 25%）
+    var popularityLevel: Int {
+        let c = sourceCount
+        return c >= 10 ? 2 : (c >= 3 ? 1 : 0)
+    }
+
+    /// 尺度ごとの強調段階
+    func level(for scale: MapScale) -> Int {
+        scale == .scenery ? tagLevel : popularityLevel
+    }
+
+    /// 尺度ごとの目立たせ度（重なったときにどちらを上に描くか）
+    func prominence(for scale: MapScale) -> Double {
+        scale == .scenery ? self.prominence : min(1, log(Double(sourceCount) + 1) / log(40))
+    }
+
     var coordinates: [CLLocationCoordinate2D] { geojson.points }
 
     /// Google マップで「この道に沿った経路」を表示する URL。始点・終点に加え、道に沿った経由地を最大 8 つ渡す
@@ -446,6 +466,23 @@ enum MapLook: String, CaseIterable, Identifiable {
     static let key = "map.look"
     static var stored: MapLook {
         get { MapLook(rawValue: UserDefaults.standard.string(forKey: key) ?? "") ?? .hybrid }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: key) }
+    }
+}
+
+/// 地図で道に色を付ける尺度。絶景度（情緒的な価値）と定番度（どれだけ知られているか）を切り替える
+enum MapScale: String, CaseIterable, Identifiable {
+    case scenery     // 絶景度（ブルー）
+    case popularity  // 定番度（アンバー）
+
+    var id: String { rawValue }
+    var title: String { self == .scenery ? "絶景度" : "定番度" }
+    var symbol: String { self == .scenery ? "mountain.2.fill" : "flame.fill" }
+    var next: MapScale { self == .scenery ? .popularity : .scenery }
+
+    static let key = "map.scale"
+    static var stored: MapScale {
+        get { MapScale(rawValue: UserDefaults.standard.string(forKey: key) ?? "") ?? .scenery }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: key) }
     }
 }

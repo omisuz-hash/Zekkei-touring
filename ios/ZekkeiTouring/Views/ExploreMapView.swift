@@ -5,6 +5,9 @@ import MapKit
 struct ExploreMapView: View {
     @AppStorage(MapLook.key) private var mapLookRaw = MapLook.hybrid.rawValue
     private var mapLook: MapLook { MapLook(rawValue: mapLookRaw) ?? .hybrid }
+    /// 色を付ける尺度。絶景度か定番度のどちらかで塗り分ける
+    @AppStorage(MapScale.key) private var mapScaleRaw = MapScale.scenery.rawValue
+    private var mapScale: MapScale { MapScale(rawValue: mapScaleRaw) ?? .scenery }
 
     @EnvironmentObject private var app: AppState
     /// 初期位置は既定の地域。表示後は地図の移動に従う
@@ -28,7 +31,7 @@ struct ExploreMapView: View {
 
     /// 全部の道にタグを出す。目立つ道ほど後に描いて、重なったときに上に来るようにする
     private var taggedRoads: [ZekkeiRoad] {
-        roads.sorted { $0.prominence < $1.prominence }
+        roads.sorted { $0.prominence(for: mapScale) < $1.prominence(for: mapScale) }
     }
 
     var body: some View {
@@ -36,22 +39,25 @@ struct ExploreMapView: View {
             Map(position: $position, selection: $mapSelection) {
                 UserAnnotation()
                 ForEach(taggedRoads) { road in
-                    let color = ZK.color(for: road)
-                    let level = road.tagLevel
-                    // 外側グロー → 本線 → 中央ハイライト（絶景度 4.5 以上）
+                    let color = ZK.color(for: road, scale: mapScale)
+                    let level = road.level(for: mapScale)
+                    // 外側グロー → 本線 → 中央ハイライト
                     if level >= 1 {
                         MapPolyline(coordinates: road.coordinates).stroke(color.opacity(0.35), lineWidth: level >= 2 ? 16 : 12)
                     }
                     MapPolyline(coordinates: road.coordinates).stroke(color, lineWidth: lineWidth(road))
-                    if level >= 2 {
+                    // 中央の白線は「もう一方の尺度も最上段」の印。絶景度と定番度が重なる道が分かる
+                    if road.level(for: mapScale.next) >= 2 {
                         MapPolyline(coordinates: road.coordinates).stroke(Color.white.opacity(0.7), lineWidth: 1.2)
                     }
                 }
                 ForEach(taggedRoads) { road in
                     if let start = road.coordinates.first {
                         Annotation(road.name, coordinate: start, anchor: .bottomLeading) {
-                            CodeTag(code: road.shortCode, fromVideo: road.isFromVideos, muted: road.displayScenery == nil,
-                                    level: road.tagLevel, thumbnail: road.tagThumbnailURL)
+                            CodeTag(code: road.shortCode, fromVideo: road.isFromVideos, muted: isMuted(road),
+                                    level: road.level(for: mapScale), thumbnail: road.tagThumbnailURL,
+                                    strongColor: mapScale == .scenery ? ZK.highlight : ZK.pop1,
+                                    normalColor: mapScale == .scenery ? ZK.accent : ZK.pop2)
                                 .onTapGesture { selected = road }
                         }
                         .tag(road)
@@ -106,6 +112,15 @@ struct ExploreMapView: View {
                     }
                     .glassPill(radius: 14)
                     .padding(.trailing, 8)
+                    // 色を付ける尺度の切り替え。「絶景の道」と「定番の道」は必ずしも一致しない
+                    Button { mapScaleRaw = mapScale.next.rawValue } label: {
+                        Image(systemName: mapScale.next.symbol)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(mapScale.next == .popularity ? ZK.pop1 : ZK.accent)
+                            .frame(width: 44, height: 44).glassPill(radius: 14)
+                    }
+                    .accessibilityLabel("\(mapScale.next.title)で色を付ける")
+                    .padding(.trailing, 8)
                     // 航空写真と道路地図の切り替え。道の形や地名を読みたい場面がある
                     Button { mapLookRaw = mapLook.next.rawValue } label: {
                         Image(systemName: mapLook.next.symbol)
@@ -130,6 +145,13 @@ struct ExploreMapView: View {
         }
         .onChange(of: mapSelection) { _, new in
             if let r = new, selected == nil { selected = r }
+        }
+        // 尺度を変えると、サーバー側で拾う道の順序も変わる。読み直して取り直す
+        .onChange(of: mapScaleRaw) { _, _ in
+            guard let region = currentRegion else { return }
+            lastCenter = nil
+            lastSpanLat = 0
+            Task { await load(center: region.center, span: region.span) }
         }
         .sheet(item: $selected, onDismiss: { mapSelection = nil }) { road in
             // 道の詳細そのものは入れ物を持たない。地図から開くときだけ入れ物を添える
@@ -193,16 +215,32 @@ struct ExploreMapView: View {
     }
 
     private func lineWidth(_ road: ZekkeiRoad) -> CGFloat {
-        let base: CGFloat = road.tagLevel >= 2 ? 5 : (road.tagLevel == 1 ? 4 : 3)
+        let level = road.level(for: mapScale)
+        let base: CGFloat = level >= 2 ? 5 : (level == 1 ? 4 : 3)
         return app.isUnlocked(road) ? base + 1.5 : base
+    }
+
+    /// 選んだ尺度のもとになる数値が無い道は、控えめに出す
+    private func isMuted(_ road: ZekkeiRoad) -> Bool {
+        mapScale == .scenery ? road.displayScenery == nil : road.sourceCount == 0
     }
 
     private var legend: some View {
         VStack(alignment: .leading, spacing: 6) {
-            CaptionLabel(text: "絶景度", size: 8)
-            legendRow(ZK.tier1, "4.5 以上")
-            legendRow(ZK.tier2, "3.5 以上")
-            legendRow(ZK.tier3, "評価が少ない")
+            CaptionLabel(text: mapScale.title, size: 8)
+            if mapScale == .scenery {
+                legendRow(ZK.tier1, "4.5 以上")
+                legendRow(ZK.tier2, "3.5 以上")
+                legendRow(ZK.tier3, "評価が少ない")
+            } else {
+                legendRow(ZK.pop1, "紹介 10 件以上")
+                legendRow(ZK.pop2, "紹介 3 件以上")
+                legendRow(ZK.tier3, "紹介が少ない")
+            }
+            HStack(spacing: 8) {
+                Capsule().fill(Color.white.opacity(0.75)).frame(width: 18, height: 2)
+                Text(mapScale == .scenery ? "定番でもある" : "絶景度も高い").font(.system(size: 11)).foregroundStyle(ZK.body)
+            }
         }
         .padding(12).glassPill(radius: 14)
     }
@@ -261,7 +299,7 @@ struct ExploreMapView: View {
             limit = Self.roadLimit(forSpanDegrees: span.latitudeDelta)
         }
         do {
-            roads = try await app.backend.nearbyRoads(center: center, radiusMeters: radius, limit: limit)
+            roads = try await app.backend.nearbyRoads(center: center, radiusMeters: radius, limit: limit, order: mapScale)
         } catch {
             app.lastError = error.localizedDescription
         }
