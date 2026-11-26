@@ -83,7 +83,8 @@ targets:
         CODE_SIGN_STYLE: Automatic
         # Team ID は Local.xcconfig（20260905_setup_xcode.sh が生成、git 管理外）から渡す
         DEVELOPMENT_TEAM: $(ZEKKEI_TEAM_ID)
-        MARKETING_VERSION: "0.1.0"
+        # 配布する版。ここが唯一の持ち主。配布時は環境変数 ZEKKEI_VERSION で上書きできる
+        MARKETING_VERSION: "1.0.2"
         CURRENT_PROJECT_VERSION: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         PRODUCT_BUNDLE_IDENTIFIER: com.zekkeido.app

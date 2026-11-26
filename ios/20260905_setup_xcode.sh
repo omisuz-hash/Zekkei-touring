@@ -11,6 +11,12 @@
 # 接続先は ~/.zekkei_supabase から読み、Local.xcconfig（git 管理外）に書き出す。
 set -uo pipefail
 
+# 配布する版は project.yml の MARKETING_VERSION が持ち主。
+# スクリプト側に既定値を書くと、書き忘れたときに古い版で配布してしまう
+project_version() {
+  awk -F'"' '/^ *MARKETING_VERSION:/{print $2; exit}' "$(dirname "$0")/project.yml"
+}
+
 # シミュレータの画面を開く。
 # Xcode 27 で Simulator.app は廃止され、DeviceHub.app が置き換わった。
 # 古い Xcode も残っている環境があるため、新しい順に試す。
@@ -139,11 +145,13 @@ if [[ $ARCHIVE -eq 1 ]]; then
 PL
   # ビルド番号は毎回更新する（同じ番号は App Store Connect が受け付けないため）
   BUILD_NO="$(date +%Y%m%d%H%M)"
+  VERSION="${ZEKKEI_VERSION:-$(project_version)}"
+  echo "版: $VERSION"
   echo "ビルド番号: $BUILD_NO"
   rm -rf build/ZekkeiTouring.xcarchive build/export
   xcodebuild -project ZekkeiTouring.xcodeproj -scheme ZekkeiTouring -configuration Release \
     -destination 'generic/platform=iOS' -archivePath build/ZekkeiTouring.xcarchive \
-    CURRENT_PROJECT_VERSION="$BUILD_NO" MARKETING_VERSION="${ZEKKEI_VERSION:-0.1.0}" \
+    CURRENT_PROJECT_VERSION="$BUILD_NO" MARKETING_VERSION="$VERSION" \
     -allowProvisioningUpdates archive 2>&1 | tee build/last_archive.log | grep -E "error:|ARCHIVE (SUCCEEDED|FAILED)" | sort -u
   if ! grep -q "ARCHIVE SUCCEEDED" build/last_archive.log; then
     if grep -q "no devices" build/last_archive.log; then
@@ -217,6 +225,7 @@ if [[ $RUN -eq 1 ]]; then
   xcrun simctl boot "$DEVICE" 2>/dev/null || true
   open_sim_window
   xcodebuild -project ZekkeiTouring.xcodeproj -scheme ZekkeiTouring -destination "id=$DEVICE" -configuration Debug \
+    CURRENT_PROJECT_VERSION="$(date +%Y%m%d%H%M)" MARKETING_VERSION="$(project_version)" \
     -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build 2>&1 | tee build/last_run_build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" | sort -u
   APP="$(find build/DerivedData -name 'ZekkeiTouring.app' -path '*iphonesimulator*' | head -1)"
   if [[ -z "$APP" ]]; then echo "アプリの生成物が見つかりません（build/last_run_build.log を確認）"; exit 1; fi
