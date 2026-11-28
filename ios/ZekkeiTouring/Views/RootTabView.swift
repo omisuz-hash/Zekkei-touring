@@ -52,7 +52,7 @@ struct RootTabView: View {
         .alert("エラー", isPresented: Binding(get: { app.lastError != nil }, set: { if !$0 { app.lastError = nil } })) {
             Button("OK") { app.lastError = nil }
         } message: {
-            Text(app.lastError ?? "")
+            Text(ZKError.humanized(app.lastError ?? ""))
         }
         .alert("取り込み", isPresented: Binding(get: { app.lastNotice != nil }, set: { if !$0 { app.lastNotice = nil } })) {
             Button("OK") { app.lastNotice = nil }
